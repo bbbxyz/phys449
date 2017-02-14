@@ -57,7 +57,7 @@ y = tf.matmul(layer2, wout) + bout
 
 #define error as sum[(y-y')^2]
 error = tf.reduce_sum(tf.square(y- y_), reduction_indices=[1])
-train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(error)
+train_step = tf.train.AdamOptimizer(learning_rate).minimize(error)
 
 #init = tf.initialize_all_variables()
 init = tf.global_variables_initializer()
