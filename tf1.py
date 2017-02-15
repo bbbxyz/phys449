@@ -8,7 +8,8 @@ import numpy as np
 import pandas as pd
 from time import time
 from sklearn.model_selection import train_test_split
-filename = "300.csv"
+
+filename = "1.csv"
 t0=time()
 nbatch = 1000 #number of batches for training
 split_test=0.2
@@ -34,7 +35,6 @@ feat = X.shape[1]
 
 
 #this is where we build the neural net
-#for now it is only a linear regression model
 n_hidden1 = 64
 n_hidden2 = 32
 
@@ -77,10 +77,10 @@ print(t2-t1,t1-t0)
 
 #calculate accuracy on the testing set
 diff = tf.square(y-y_)
-accuracy = tf.sqrt(tf.reduce_mean(tf.cast(diff, tf.float32)))
-print(sess.run(accuracy, feed_dict={x: testX , y_: testY }))
+accuracy = tf.sqrt(tf.reduce_mean(tf.cast(diff, tf.float32)))/tf.reduce_mean(y)
+score = sess.run(accuracy, feed_dict={x: testX , y_: testY })
 predictY = sess.run(y, feed_dict={x: testX , y_: testY })
-
+print(score)
 #unnormalize if needed
 #predictY = predictY*(maxY-minY)+minY
-print( predictY, testY)
+#print( predictY, testY)

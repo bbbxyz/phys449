@@ -4,15 +4,6 @@ import glob, math, re
 import matplotlib.pyplot as plt
 import IsingMonteCarlo as im
 
-dimensions=25
-iterations=5000
-
-#run the model for different temperatures
-temps=[0.5, 1, 5, 100, 1000, 10000]
-for i in temps:
-	ising = im.IsingMonteCarlo(dimensions, i, iterations)
-	ising.run()
-
 #plots each dataset's energies and inital and final states
 def plot_set(f, fig1, fig2):
 	df = pd.read_csv(f)
@@ -46,13 +37,14 @@ def alphanum_key(s):
 
 #sort the files in numerical order
 datasets = []
-files = glob.glob('*.csv')
+files = glob.glob('data/*.csv')
 files.sort(key=alphanum_key)
 for file in files:
 	f=open(file, 'r')
 	datasets.append(file)
 	f.close()
 	
+print(datasets)
 
 f, sp = plt.subplots(2, len(datasets), sharex=True, sharey=True)
 plt.figure("energies")
@@ -61,7 +53,7 @@ for i, ds in enumerate(datasets):
 	
 plt.figure("energies")
 plt.xlabel('Iterations')
-plt.ylabel('Energy (J)')
-plt.legend(labels=temps)
+plt.ylabel('Energy')
+plt.legend(labels=datasets)
 
 plt.show()
