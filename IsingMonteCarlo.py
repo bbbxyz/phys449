@@ -9,10 +9,9 @@ K_B = 1 #boltzmann const in m^2 kg s^-2 K^-1
 class IsingMonteCarlo:
 	
 	def find_energy(self, p_num):
-		m = [[0.5, 1, 0.5],[1, 0, 1],[0.5, 1, 0.5]]
+		m = [[0, 1, 0],[1, 0, 1],[0, 1, 0]]
 		conv = signal.convolve2d(self.Grid[p_num], m, mode='same', boundary='wrap')
-		energy = -self.J*np.sum(np.dot(conv, self.Grid[p_num]))
-		print(energy)
+		energy = -self.J*np.sum(np.multiply(conv, self.Grid[p_num]))
 		return energy
 	 
 	
@@ -107,8 +106,8 @@ class IsingMonteCarlo:
 		self.num_permutations = num_permutations
 		self.fincrement=10 #take a snapshot every n frames
 		self.p_num = 0       #current permutation number
-		self.J = 1    #coupling coefficient
-		self.h = 0           #B field - for now assume h = 0
+		self.J = 1 #coupling coefficient
+		self.h = 0.0           #B field - for now assume h = 0
 		self.T = T  #temp in Kelvin
 		self.Grid = np.zeros((num_permutations, self.N, self.N))
 		#create array storing the energy for each state change
