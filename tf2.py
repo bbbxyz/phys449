@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 @author: mass
 convolution model based on Tensorflow's deep MNIST model
@@ -7,7 +6,6 @@ https://www.tensorflow.org/versions/r0.10/tutorials/mnist/pros/
 todo:
 - load test set by batches to avoid running out of memory
 - optimize hyperparams
-- 
 """
 
 import Constants as cst
@@ -15,23 +13,24 @@ import glob, math
 import tensorflow as tf
 import numpy as np
 import pandas as pd
+from random import shuffle
 from sklearn.model_selection import train_test_split
 #from sklearn.cross_validation import train_test_split
 
 
 
-nbatch = 100 #number of batches for training
-split_test=0.001
-learning_rate = 5e-5
+nbatch = 250 #number of batches for training
+split_test=0.001 #use a small split for now to avoid running out of mem.
+learning_rate = 1e-5 #learning rate for gradient descent
 NUM_CHANNELS=1 #number of channels in the input "image"
 
 feat = cst.lattice_size*cst.lattice_size
 data_type = tf.float32
 
-#this is where we build the neural net
 x = tf.placeholder(tf.float32, [None, feat])
 y_ = tf.placeholder(tf.float32, [None,1])
 
+#helper functions
 def weight_variable(shape):
   initial = tf.truncated_normal(shape, mean=0.0, stddev=0.1)
   return tf.Variable(initial)
@@ -46,9 +45,11 @@ def conv2d(x, W):
 def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
+                        
+#this is where we build the neural net
 
-feat_conv1=8
-feat_conv2=16
+feat_conv1=2
+feat_conv2=4
 size_fc=1024
 
 W_conv1 = weight_variable([3, 3, 1, feat_conv1])
@@ -82,7 +83,7 @@ y=tf.nn.sigmoid(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 #define error as mean[(y-y')^2]
 error = tf.reduce_mean(tf.square(tf.subtract(y,y_)))
 
-opt = tf.train.GradientDescentOptimizer(learning_rate)
+opt = tf.train.AdamOptimizer(learning_rate)
 grads =opt.compute_gradients(error)
 train_step = opt.minimize(error)
 
@@ -98,15 +99,16 @@ def train_set(trainX, trainY):
       batch_xs =  trainX[lowbound:upbound, :]
       batch_ys =  trainY[lowbound:upbound]  
       sess.run(train_step, feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 0.8})
-      if(i%(nbatch/5) ==0):
-		err = sess.run(error, feed_dict={x: batch_xs , y_: batch_ys,keep_prob: 0.8 })
-		print(math.sqrt(err))
+      if(i%(nbatch/5.0) ==0):
+        err = sess.run(error, feed_dict={x: batch_xs , y_: batch_ys,keep_prob: 0.8 })
+        print(math.sqrt(err))
     
 #load all our datasets
 files = glob.glob('data/*.csv')
 datasets =[]
 testYs=()
 testXs=()
+shuffle(files)
 for file in files:
     print(file)
     df=pd.read_csv(file)
@@ -139,7 +141,9 @@ predictY = sess.run(y, feed_dict={x: testX , y_: testY, keep_prob: 1.0 })
 print(score)
 
 #unnormalize if needed
-#predictY = predictY*(maxY-minY)+minY
+predictY = predictY*(maxY-minY)+minY
+testY = testY*(maxY-minY)+minY
+
 print( predictY[0:10], testY[0:10], (testY[0:10]-predictY[0:10]))
 #np.savetxt("testY.csv",testY , delimiter=",")
 #np.savetxt("predictY.csv", predictY, delimiter=",")
