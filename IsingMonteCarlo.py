@@ -9,7 +9,7 @@ K_B = 1 #boltzmann const in m^2 kg s^-2 K^-1
 class IsingMonteCarlo:
 	
 	def find_energy(self, p_num):
-		m = [[0, 1, 0],[1, 0, 1],[0, 1, 0]]
+		m = [[0.5, 1, 0.5],[1, 0.5, 1],[0.5, 1, 0.5]]
 		conv = signal.convolve2d(self.Grid[p_num], m, mode='same', boundary='wrap')
 		energy = -self.J*np.sum(np.multiply(conv, self.Grid[p_num]))
 		return energy
@@ -55,8 +55,8 @@ class IsingMonteCarlo:
 			self.p_num+=1
 			if i%(self.num_permutations/100) == 0:
 				percentage_complete = i/self.num_permutations
-				print('                     ', end='\r', flush=False)
-				print(percentage_complete,"% complete!", end='\r', flush=False)
+				#print('                     ', end='\r', flush=False)
+				#print(percentage_complete,"% complete!", end='\r', flush=False)
 		frame=0
 		#fig = plt.figure()
 		#im = plt.imshow(self.Grid[frame], animated=True, interpolation='none')
@@ -92,7 +92,7 @@ class IsingMonteCarlo:
 
 		#NOW SAVE self.Grid AND energies TO A TEXT FILE THAT CAN BE USED BY TENSOR FLOW
 		#save as integers not floats to save space (we're only using integer values anyway)
-		outfile = "data/%i.%i.csv" % (self.T, self.nid)
+		outfile = "data/%f.%i.csv" % (self.T, self.nid)
 		np.savetxt(outfile,data , delimiter=",", fmt='%i')
 		
 

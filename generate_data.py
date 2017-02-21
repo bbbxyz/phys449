@@ -1,15 +1,16 @@
+import Constants as cst
 import numpy 
 import pandas as pd
 import glob, math, re
 import matplotlib.pyplot as plt
 import IsingMonteCarlo as im
 
-dimensions=100
-instances=1
-iterations=5000
+dimensions=cst.lattice_size
+instances= 200
+iterations=500
 
 #run the model for different temperatures
-temps=[0.1, 2, 2.5, 3, 4 ]
+temps=[ 0.5, 1, 2, 5, 10, 100 ]
 
 for i in temps:
 	for nid in range(instances):
