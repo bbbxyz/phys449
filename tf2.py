@@ -4,9 +4,9 @@ convolution model based on Tensorflow's deep MNIST model
 https://www.tensorflow.org/versions/r0.10/tutorials/mnist/pros/
 
 todo:
-- load test set by batches to avoid running out of memory
 - optimize hyperparams
 """
+from __future__ import print_function
 
 import Constants as cst
 import glob, math
@@ -14,15 +14,17 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 from random import shuffle
-from sklearn.model_selection import train_test_split
-#from sklearn.cross_validation import train_test_split
+from time import time
+#from sklearn.model_selection import train_test_split
+from sklearn.cross_validation import train_test_split
 
 
 
-nbatch = 250 #number of batches for training
-split_test=0.001 #use a small split for now to avoid running out of mem.
-learning_rate = 1e-5 #learning rate for gradient descent
+nbatch = 100 #number of batches for training
+split_test = 0.4
+learning_rate = 4e-6 #learning rate for gradient descent
 NUM_CHANNELS=1 #number of channels in the input "image"
+epsilon = 0.05
 
 feat = cst.lattice_size*cst.lattice_size
 data_type = tf.float32
@@ -45,11 +47,9 @@ def conv2d(x, W):
 def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
-                        
-#this is where we build the neural net
 
-feat_conv1=2
-feat_conv2=4
+feat_conv1=8
+feat_conv2=8
 size_fc=1024
 
 W_conv1 = weight_variable([3, 3, 1, feat_conv1])
@@ -81,15 +81,21 @@ b_fc2 = bias_variable([1])
 y=tf.nn.sigmoid(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
 #define error as mean[(y-y')^2]
-error = tf.reduce_mean(tf.square(tf.subtract(y,y_)))
+error = 0.5*tf.reduce_mean(tf.square(y-y_))
 
+#create optimizer
 opt = tf.train.AdamOptimizer(learning_rate)
-grads =opt.compute_gradients(error)
+grads = opt.compute_gradients(error)
 train_step = opt.minimize(error)
 
-#init = tf.initialize_all_variables()
-init = tf.global_variables_initializer()
-sess = tf.Session()
+diff = tf.square(y-y_)
+accuracy = tf.sqrt(tf.reduce_mean(tf.cast(diff, tf.float32)))
+
+init = tf.initialize_all_variables()
+#init = tf.global_variables_initializer()
+sess = tf.Session(config=tf.ConfigProto(
+    intra_op_parallelism_threads=4))
+#sess = tf.Session()
 sess.run(init)
 
 def train_set(trainX, trainY):
@@ -98,52 +104,75 @@ def train_set(trainX, trainY):
       upbound = int(len(trainX)*(i+1)/nbatch)
       batch_xs =  trainX[lowbound:upbound, :]
       batch_ys =  trainY[lowbound:upbound]  
-      sess.run(train_step, feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 0.8})
-      if(i%(nbatch/5.0) ==0):
-        err = sess.run(error, feed_dict={x: batch_xs , y_: batch_ys,keep_prob: 0.8 })
-        print(math.sqrt(err))
+      sess.run(train_step, feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 0.5})
+
+
+def test_set(testX, testY):
+    score = sess.run(accuracy, feed_dict={x: testX , y_: testY,keep_prob: 1.0 })
+    return score
     
-#load all our datasets
+#split for train/test
 files = glob.glob('data/*.csv')
-datasets =[]
-testYs=()
-testXs=()
-shuffle(files)
-for file in files:
-    print(file)
-    df=pd.read_csv(file)
-    Y = df.values[:, -1]
-    Y = np.reshape(Y, (len(Y),1))
-    X = df.values[:, :-1]
-    
-    #scale X to [0,1]
-    X = (X+1.0)/2.0
-    
-    #scale Y values to range 0,1]
-    maxY = float(max(Y))
-    minY = float(min(Y))
-    Y = (Y-minY)/(maxY-minY) 
-        
-    #split the dataset for training and testing
-    trainX, testX, trainY, testY = train_test_split(X,Y,test_size=split_test)
-    testYs = testYs + (testY,)
-    testXs = testXs + (testX,)
-    train_set(trainX, trainY)
+train, test = train_test_split(files,test_size=split_test)
 
-testX = np.vstack(testXs)
-testY = np.vstack(testYs)
-
+ 
 #calculate accuracy on the testing set
-diff = tf.square(y-y_)
-accuracy = tf.sqrt(tf.reduce_mean(tf.cast(diff, tf.float32)))/tf.reduce_mean(y_)
-score = sess.run(accuracy, feed_dict={x: testX , y_: testY,keep_prob: 1.0 })
-predictY = sess.run(y, feed_dict={x: testX , y_: testY, keep_prob: 1.0 })
-print(score)
+def calculate_score():
+    total_score = 0.0 
+    for file in test:
+      df=pd.read_csv(file)
+      Y = df.values[:, -1]
+      Y = np.reshape(Y, (len(Y),1))
+      X = df.values[:, :-1]
+
+      #scale X to [0,1]
+      X = (X+1.0)/2.0
+
+      #scale Y values to range 0,1]
+      maxY = float(max(Y))
+      minY = float(min(Y))
+      Y = (Y-minY)/(maxY-minY) 
+      #split the dataset for training and testing
+      total_score += test_set(X, Y)
+    return total_score/float(len(test))
+
+
+k = 0 #counter to keep track of number of times we've trained on the entire set 
+sc = 1.0 
+
+#start training until test set error is smaller than threshold 
+print("%%%%%%%%%%%%%%%%%\nStarting training\n%%%%%%%%%%%%%%%%%\n")
+while(sc>epsilon): 
+  shuffle(train)
+  t0=time()
+  for file in train:
+      #print(file)
+      df=pd.read_csv(file)
+      Y = df.values[:, -1]
+      Y = np.reshape(Y, (len(Y),1))
+      X = df.values[:, :-1]
+    
+      #scale X to [0,1]
+      X = (X+1.0)/2.0
+    
+      #scale Y values to range 0,1]
+      maxY = float(max(Y))
+      minY = float(min(Y))
+      Y = (Y-minY)/(maxY-minY) 
+      #split the dataset for training and testing
+      train_set(X, Y)
+  t1=time()    
+  sc = calculate_score()
+  t2=time()
+  print("Error: %f, Training time: %is, Test time: %is,\
+   iteration %i" % (sc, (t1-t0),(t2-t1), k),end='\n')
+  k += 1
+
+print("\n")
+print(calculate_score())
 
 #unnormalize if needed
-predictY = predictY*(maxY-minY)+minY
-testY = testY*(maxY-minY)+minY
-
-print( predictY[0:10], testY[0:10], (testY[0:10]-predictY[0:10]))
+#predictY = predictY*(maxY-minY)+minY
+#testY = testY*(maxY-minY)+minY
 #np.savetxt("testY.csv",testY , delimiter=",")
 #np.savetxt("predictY.csv", predictY, delimiter=",")
