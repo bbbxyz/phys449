@@ -15,16 +15,19 @@ import numpy as np
 import pandas as pd
 from random import shuffle
 from time import time
-#from sklearn.model_selection import train_test_split
-from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import train_test_split
+#from sklearn.cross_validation import train_test_split
 
 
 
-nbatch = 100 #number of batches for training
+nbatch = cst.iterations/100 #number of batches for training
 split_test = 0.4
-learning_rate = 4e-6 #learning rate for gradient descent
-NUM_CHANNELS=1 #number of channels in the input "image"
-epsilon = 0.05
+learning_rate = 5e-6 #learning rate for gradient descent
+epsilon = 0.1
+
+#split for train/test
+files = glob.glob('data/*.csv')
+train, test = train_test_split(files,test_size=split_test)
 
 feat = cst.lattice_size*cst.lattice_size
 data_type = tf.float32
@@ -48,9 +51,9 @@ def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
 
-feat_conv1=8
+feat_conv1=16
 feat_conv2=8
-size_fc=1024
+size_fc=32
 
 W_conv1 = weight_variable([3, 3, 1, feat_conv1])
 b_conv1 = bias_variable([feat_conv1])
@@ -78,10 +81,10 @@ h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 W_fc2 = weight_variable([size_fc, 1])
 b_fc2 = bias_variable([1])
 
-y=tf.nn.sigmoid(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
+y=tf.nn.relu(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
 #define error as mean[(y-y')^2]
-error = 0.5*tf.reduce_mean(tf.square(y-y_))
+error = 0.5*tf.reduce_mean(tf.square(tf.subtract(y,y_)))
 
 #create optimizer
 opt = tf.train.AdamOptimizer(learning_rate)
@@ -91,13 +94,34 @@ train_step = opt.minimize(error)
 diff = tf.square(y-y_)
 accuracy = tf.sqrt(tf.reduce_mean(tf.cast(diff, tf.float32)))
 
-init = tf.initialize_all_variables()
-#init = tf.global_variables_initializer()
-sess = tf.Session(config=tf.ConfigProto(
-    intra_op_parallelism_threads=4))
-#sess = tf.Session()
+#init = tf.initialize_all_variables()
+init = tf.global_variables_initializer()
+#sess = tf.Session(config=tf.ConfigProto(
+#    intra_op_parallelism_threads=4))
+sess = tf.Session()
 sess.run(init)
 
+def get_normalization_params():
+    #find mean first
+    sum = 0.0
+    n=0
+    for file in train:
+      df=pd.read_csv(file)
+      Y = df.values[:, -1]
+      Y = np.reshape(Y, (len(Y),1))
+      sum += np.sum(Y)
+      n += len(Y)
+    mean = sum/float(n)
+    #find stddev
+    var=0
+    for file in train:
+      df=pd.read_csv(file)
+      Y = df.values[:, -1]
+      Y = np.reshape(Y, (len(Y),1))
+      var += np.sum(np.square(Y-mean))
+    stddev = np.sqrt(var/float(n))
+    return mean,stddev
+    
 def train_set(trainX, trainY):
     for i in range(nbatch):
       lowbound = int(len(trainX)*i/nbatch)
@@ -111,9 +135,6 @@ def test_set(testX, testY):
     score = sess.run(accuracy, feed_dict={x: testX , y_: testY,keep_prob: 1.0 })
     return score
     
-#split for train/test
-files = glob.glob('data/*.csv')
-train, test = train_test_split(files,test_size=split_test)
 
  
 #calculate accuracy on the testing set
@@ -139,6 +160,8 @@ def calculate_score():
 
 k = 0 #counter to keep track of number of times we've trained on the entire set 
 sc = 1.0 
+mean,stddev = get_normalization_params()
+print(mean,stddev)
 
 #start training until test set error is smaller than threshold 
 print("%%%%%%%%%%%%%%%%%\nStarting training\n%%%%%%%%%%%%%%%%%\n")
@@ -155,10 +178,9 @@ while(sc>epsilon):
       #scale X to [0,1]
       X = (X+1.0)/2.0
     
-      #scale Y values to range 0,1]
-      maxY = float(max(Y))
-      minY = float(min(Y))
-      Y = (Y-minY)/(maxY-minY) 
+      #normalize Y
+      Y = (Y-mean)/stddev
+      
       #split the dataset for training and testing
       train_set(X, Y)
   t1=time()    
@@ -172,7 +194,6 @@ print("\n")
 print(calculate_score())
 
 #unnormalize if needed
-#predictY = predictY*(maxY-minY)+minY
-#testY = testY*(maxY-minY)+minY
+#predictY = predictY*stddev+mean
 #np.savetxt("testY.csv",testY , delimiter=",")
 #np.savetxt("predictY.csv", predictY, delimiter=",")
