@@ -11,10 +11,7 @@ import matplotlib.pyplot as plt
 import IsingMonteCarlo as im
 
 
-
-
-#run the model for different temperatures
-
+#run the model for selected temperatures
 for i in cst.temps:
     for nid in range(cst.instances):
         print(i, nid)

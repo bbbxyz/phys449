@@ -1,10 +1,6 @@
 """
-@author: mass
-convolution model based on Tensorflow's deep MNIST model
-https://www.tensorflow.org/versions/r0.10/tutorials/mnist/pros/
+@author: massine yahia
 
-todo:
-- optimize hyperparams
 """
 from __future__ import print_function
 
@@ -20,10 +16,10 @@ from sklearn.model_selection import train_test_split
 
 
 
-nbatch = cst.iterations/100 #number of batches for training
+nbatch = cst.iterations/2 #number of batches for training
 split_test = 0.4
-learning_rate = 5e-6 #learning rate for gradient descent
-epsilon = 0.1
+learning_rate = 1e-7 #learning rate for gradient descent
+epsilon = 0.05
 
 #split for train/test
 files = glob.glob('data/*.csv')
@@ -37,7 +33,7 @@ y_ = tf.placeholder(tf.float32, [None,1])
 
 #helper functions
 def weight_variable(shape):
-  initial = tf.truncated_normal(shape, mean=0.0, stddev=0.1)
+  initial = tf.truncated_normal(shape, mean=0.0, stddev=0.02)
   return tf.Variable(initial)
 
 def bias_variable(shape):
@@ -51,34 +47,35 @@ def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
 
-feat_conv1=16
-feat_conv2=8
-size_fc=32
-
-W_conv1 = weight_variable([3, 3, 1, feat_conv1])
-b_conv1 = bias_variable([feat_conv1])
+n_filters=[1, 16, 16]
+filter_sizes=[3, 3, 3]
 
 x_image = tf.reshape(x, [-1,cst.lattice_size,cst.lattice_size,1])
+current_input = x_image
 
-h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
-h_pool1 = max_pool_2x2(h_conv1)
+for layer_i, n_output in enumerate(n_filters[1:]):
+    n_input = current_input.get_shape().as_list()[3]
+    W = weight_variable([
+            filter_sizes[layer_i],
+            filter_sizes[layer_i],
+            n_input, n_output])
+    b = bias_variable([n_output])
+    output = tf.nn.relu(
+        tf.add(conv2d(current_input, W), b))
+    current_input = output
 
-W_conv2 = weight_variable([3, 3, feat_conv1, feat_conv2])
-b_conv2 = bias_variable([feat_conv2])
+conv_output_size = reduce(lambda x, y: x*y, current_input.get_shape().as_list() [1:])
+conv_output_flat = tf.reshape(current_input, [-1, conv_output_size])
 
-h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
-h_pool2 = max_pool_2x2(h_conv2)
+W_fc1 = weight_variable([conv_output_size, conv_output_size])
+b_fc1 = bias_variable([conv_output_size])
 
-W_fc1 = weight_variable([cst.lattice_size/4 * cst.lattice_size/4 * feat_conv2, size_fc])
-b_fc1 = bias_variable([size_fc])
-
-h_pool2_flat = tf.reshape(h_pool2, [-1, cst.lattice_size/4 * cst.lattice_size/4 *feat_conv2])
-h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
+h_fc1 = tf.nn.relu(tf.matmul(conv_output_flat, W_fc1) + b_fc1)
 
 keep_prob = tf.placeholder(tf.float32)
 h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
-W_fc2 = weight_variable([size_fc, 1])
+W_fc2 = weight_variable([conv_output_size, 1])
 b_fc2 = bias_variable([1])
 
 y=tf.nn.relu(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
@@ -87,17 +84,14 @@ y=tf.nn.relu(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 error = 0.5*tf.reduce_mean(tf.square(tf.subtract(y,y_)))
 
 #create optimizer
-opt = tf.train.AdamOptimizer(learning_rate)
-grads = opt.compute_gradients(error)
-train_step = opt.minimize(error)
+train_step = tf.train.AdamOptimizer(learning_rate).minimize(error)
 
 diff = tf.square(y-y_)
 accuracy = tf.sqrt(tf.reduce_mean(tf.cast(diff, tf.float32)))
 
 #init = tf.initialize_all_variables()
 init = tf.global_variables_initializer()
-#sess = tf.Session(config=tf.ConfigProto(
-#    intra_op_parallelism_threads=4))
+print("Starting TensorFlow session")
 sess = tf.Session()
 sess.run(init)
 
@@ -107,7 +101,7 @@ def get_normalization_params():
     n=0
     for file in train:
       df=pd.read_csv(file)
-      Y = df.values[:, -1]
+      Y = df.values[:, -2]
       Y = np.reshape(Y, (len(Y),1))
       sum += np.sum(Y)
       n += len(Y)
@@ -116,19 +110,19 @@ def get_normalization_params():
     var=0
     for file in train:
       df=pd.read_csv(file)
-      Y = df.values[:, -1]
+      Y = df.values[:, -2]
       Y = np.reshape(Y, (len(Y),1))
       var += np.sum(np.square(Y-mean))
     stddev = np.sqrt(var/float(n))
     return mean,stddev
-    
+
 def train_set(trainX, trainY):
     for i in range(nbatch):
       lowbound = int(len(trainX)*i/nbatch)
       upbound = int(len(trainX)*(i+1)/nbatch)
       batch_xs =  trainX[lowbound:upbound, :]
       batch_ys =  trainY[lowbound:upbound]  
-      sess.run(train_step, feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 0.5})
+      sess.run(train_step, feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 1.0})
 
 
 def test_set(testX, testY):
@@ -142,9 +136,9 @@ def calculate_score():
     total_score = 0.0 
     for file in test:
       df=pd.read_csv(file)
-      Y = df.values[:, -1]
+      Y = df.values[:, -2]
       Y = np.reshape(Y, (len(Y),1))
-      X = df.values[:, :-1]
+      X = df.values[:, :-2]
 
       #scale X to [0,1]
       X = (X+1.0)/2.0
@@ -160,20 +154,22 @@ def calculate_score():
 
 k = 0 #counter to keep track of number of times we've trained on the entire set 
 sc = 1.0 
+print("Calculation normalization parameters")
+shuffle(train)
 mean,stddev = get_normalization_params()
-print(mean,stddev)
+print("Done")
 
 #start training until test set error is smaller than threshold 
-print("%%%%%%%%%%%%%%%%%\nStarting training\n%%%%%%%%%%%%%%%%%\n")
+print("%%%%%%%%%%%%%%%%%\nStarting training\n")
 while(sc>epsilon): 
   shuffle(train)
   t0=time()
   for file in train:
       #print(file)
       df=pd.read_csv(file)
-      Y = df.values[:, -1]
+      Y = df.values[:, -2]
       Y = np.reshape(Y, (len(Y),1))
-      X = df.values[:, :-1]
+      X = df.values[:, :-2]
     
       #scale X to [0,1]
       X = (X+1.0)/2.0
@@ -189,8 +185,10 @@ while(sc>epsilon):
   print("Error: %f, Training time: %is, Test time: %is,\
    iteration %i" % (sc, (t1-t0),(t2-t1), k),end='\n')
   k += 1
+print("Done!")
 
 print("\n")
+print("Calculating validation score")
 print(calculate_score())
 
 #unnormalize if needed
