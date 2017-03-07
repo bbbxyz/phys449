@@ -13,14 +13,14 @@ import matplotlib.animation as animation
 
 
 
-K_B = 1 #boltzmann const in m^2 kg s^-2 K^-1
+K_B = 1.0 #boltzmann const in m^2 kg s^-2 K^-1
 
 class IsingMonteCarlo:
     
     def find_energy(self, p_num):
         m = [[0.5, 1, 0.5],[1, 0.5, 1],[0.5, 1, 0.5]]
         conv = signal.convolve2d(self.Grid[p_num], m, mode='same', boundary='wrap')
-        energy = -self.J*0.5*np.sum(np.multiply(conv, self.Grid[p_num]))
+        energy = -0.25*self.J*np.sum(np.multiply(conv, self.Grid[p_num]))
         return energy
     
     def find_magnetization(self, p_num):
@@ -51,6 +51,7 @@ class IsingMonteCarlo:
         self.mags[self.p_num] = self.find_magnetization(self.p_num)
         
     def run(self):
+        #generate a random seed lattice
         for j in range(self.N):
             for i in range(self.N):
                 var = np.random.randint(0,2)
@@ -77,19 +78,17 @@ class IsingMonteCarlo:
             data.append(newrow)
         data=np.array(data)
         
-        #NOW SAVE self.Grid AND energies TO A TEXT FILE THAT CAN BE USED BY TENSOR FLOW
         #save as integers not floats to save space (we're only using integer values anyway)
         outfile = "data/%f.%i.csv" % (self.T, self.nid)
         np.savetxt(outfile,data , delimiter=",", fmt='%.2f')
         
 
-    def __init__(self, N=20, T=1, num_permutations=1000, nid=0):
-        cst.skip = 1000
+    def __init__(self, N=20, T=1.0, num_permutations=1000, nid=0):
         self.N = N
         self.nid = nid
         self.num_permutations = num_permutations + cst.skip
         self.p_num = 0      #current permutation number
-        self.J = 1          #coupling coefficient
+        self.J = 1.0       #coupling coefficient
         self.h = 0.0        #B field - for now assume h = 0
         self.T = T          #temp in Kelvin
         self.Grid = np.zeros((self.num_permutations, self.N, self.N))
