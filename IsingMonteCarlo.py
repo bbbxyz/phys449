@@ -19,7 +19,7 @@ class IsingMonteCarlo:
     def find_energy(self, p_num):
         m = [[0.5, 1, 0.5],[1, 0.5, 1],[0.5, 1, 0.5]]
         conv = signal.convolve2d(self.Grid[p_num], m, mode='same', boundary='wrap')
-        energy = -self.J*np.sum(np.multiply(conv, self.Grid[p_num]))
+        energy = -self.J*0.5*np.sum(np.multiply(conv, self.Grid[p_num]))
         return energy
      
     
