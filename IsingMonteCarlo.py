@@ -18,21 +18,21 @@ K_B = 1.0 #boltzmann const in m^2 kg s^-2 K^-1
 class IsingMonteCarlo:
     
     def find_energy(self, p_num):
-        m = [[0.5, 1, 0.5],[1, 0.5, 1],[0.5, 1, 0.5]]
+        m = [[0.5, 1, 0.5],[1, 0, 1],[0.5, 1, 0.5]]
         conv = signal.convolve2d(self.Grid[p_num], m, mode='same', boundary='wrap')
-        energy = -0.25*self.J*np.sum(np.multiply(conv, self.Grid[p_num]))
+        energy = -(1.0/6.0)*self.J*np.sum(np.multiply(conv, self.Grid[p_num]))\
+                    - self.h*self.mu*np.sum(self.Grid[p_num])
         return energy
     
     def find_magnetization(self, p_num):
         mag = np.mean(self.Grid[p_num])
         return mag
      
-    
     def state_change(self, Grid, p_num, energies, mags):
         rand_x = np.random.randint(0,self.N)
         rand_y = np.random.randint(0,self.N)
         self.Grid[self.p_num][:][:] = self.Grid[self.p_num-1][:][:]
-        self.Grid[self.p_num][rand_y][rand_x] = -1 * self.Grid[self.p_num-1][rand_y][rand_x]
+        self.Grid[self.p_num][rand_y][rand_x] = -1*self.Grid[self.p_num-1][rand_y][rand_x]
         new_energy = self.find_energy(self.p_num)
         old_energy = self.find_energy(self.p_num-1)
         if new_energy <= old_energy:
@@ -88,8 +88,9 @@ class IsingMonteCarlo:
         self.nid = nid
         self.num_permutations = num_permutations + cst.skip
         self.p_num = 0      #current permutation number
-        self.J = 1.0       #coupling coefficient
-        self.h = 0.0        #B field - for now assume h = 0
+        self.J = 1.0        #coupling coefficient
+        self.h = -0.1        #B field - for now assume h = 0
+        self.mu = 1.0       #magnetic moment
         self.T = T          #temp in Kelvin
         self.Grid = np.zeros((self.num_permutations, self.N, self.N))
         self.energies = np.zeros(self.num_permutations)
