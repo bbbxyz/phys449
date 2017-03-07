@@ -14,20 +14,25 @@ def plot_set(f):
     #temp = str(temps[0])+" K"
     energies = df.values[:,-2]
     mags = np.abs(np.mean(df.values[:,-1]))
+    mags_e = np.std(df.values[:,-1])
     temps = df.values[-1,-3]
     temp = str(temps)+" K"
     spins = df.values[:,:-3]
     N = cst.lattice_size
     '''
+    plt.figure("spins")
     end = spins[-1].reshape((N,N))
     first = spins[0].reshape((N,N))
-    plt.imshow(first,interpolation ='none')
-    plt.imshow(end,interpolation ='none')
+    plt.subplot(211), plt.imshow(first,interpolation ='none')
+    plt.subplot(212), plt.imshow(end,interpolation ='none')
+    plt.show()
     '''
+    
     plt.figure("energies")
     plt.plot(energies)
     plt.figure("magnetizations")
-    plt.scatter(temps, mags)
+    plt.errorbar(temps, mags, yerr=mags_e, color='k')
+    plt.plot((cst.T_c, cst.T_c), (0, 1), 'r--')
 
 
 
