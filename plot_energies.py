@@ -9,8 +9,11 @@ import numpy as np
 #plots each dataset's energies and inital and final states
 def plot_set(f):
     df = pd.read_csv(f)
-    mags = np.abs(np.mean(df.values[:,-1]))
+    #mags = np.abs(df.values[:,-1])
+    #temps = df.values[:,-3]
+    #temp = str(temps[0])+" K"
     energies = df.values[:,-2]
+    mags = np.abs(np.mean(df.values[:,-1]))
     temps = df.values[-1,-3]
     temp = str(temps)+" K"
     spins = df.values[:,:-3]
@@ -54,6 +57,9 @@ for i, ds in enumerate(datasets):
 plt.figure("energies")
 plt.xlabel('Iterations')
 plt.ylabel('Energy')
+plt.figure("magnetizations")
+plt.xlabel('Temperature (K)')
+plt.ylabel('Average Magnetization per Site')
 #plt.legend(labels=datasets)
 
 plt.show()
