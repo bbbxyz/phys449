@@ -15,10 +15,10 @@ from sklearn.model_selection import train_test_split
 #from sklearn.cross_validation import train_test_split
 
 
-
-nbatch = cst.iterations/2 #number of batches for training
+y_col = -3 #-3: temp, -2: energy, -1: magnetization
+nbatch = 1 #number of batches for training
 split_test = 0.4
-learning_rate = 1e-7 #learning rate for gradient descent
+learning_rate = 1e-6 #learning rate for gradient descent
 epsilon = 0.05
 
 #split for train/test
@@ -101,7 +101,7 @@ def get_normalization_params():
     n=0
     for file in train:
       df=pd.read_csv(file)
-      Y = df.values[:, -2]
+      Y = df.values[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
       sum += np.sum(Y)
       n += len(Y)
@@ -110,7 +110,7 @@ def get_normalization_params():
     var=0
     for file in train:
       df=pd.read_csv(file)
-      Y = df.values[:, -2]
+      Y = df.values[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
       var += np.sum(np.square(Y-mean))
     stddev = np.sqrt(var/float(n))
@@ -136,17 +136,15 @@ def calculate_score():
     total_score = 0.0 
     for file in test:
       df=pd.read_csv(file)
-      Y = df.values[:, -2]
+      Y = df.values[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
-      X = df.values[:, :-2]
+      X = df.values[:, :y_col]
 
       #scale X to [0,1]
       X = (X+1.0)/2.0
 
       #scale Y values to range 0,1]
-      maxY = float(max(Y))
-      minY = float(min(Y))
-      Y = (Y-minY)/(maxY-minY) 
+      Y = Y*stddev + mean 
       #split the dataset for training and testing
       total_score += test_set(X, Y)
     return total_score/float(len(test))
@@ -167,9 +165,9 @@ while(sc>epsilon):
   for file in train:
       #print(file)
       df=pd.read_csv(file)
-      Y = df.values[:, -2]
+      Y = df.values[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
-      X = df.values[:, :-2]
+      X = df.values[:, :y_col]
     
       #scale X to [0,1]
       X = (X+1.0)/2.0
