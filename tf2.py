@@ -15,7 +15,7 @@ from sklearn.model_selection import train_test_split
 #from sklearn.cross_validation import train_test_split
 
 
-y_col = -3 #-3: temp, -2: energy, -1: magnetization
+y_col = -2 #-3: temp, -2: energy, -1: magnetization
 nbatch = 1 #number of batches for training
 split_test = 0.4
 learning_rate = 1e-6 #learning rate for gradient descent
@@ -33,7 +33,7 @@ y_ = tf.placeholder(tf.float32, [None,1])
 
 #helper functions
 def weight_variable(shape):
-  initial = tf.truncated_normal(shape, mean=0.0, stddev=0.02)
+  initial = tf.truncated_normal(shape, mean=0.0, stddev=0.1)
   return tf.Variable(initial)
 
 def bias_variable(shape):
@@ -138,13 +138,14 @@ def calculate_score():
       df=pd.read_csv(file)
       Y = df.values[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
-      X = df.values[:, :y_col]
+      X = df.values[:, :-3]
 
       #scale X to [0,1]
       X = (X+1.0)/2.0
 
-      #scale Y values to range 0,1]
-      Y = Y*stddev + mean 
+      #Normalize y
+      Y = (Y-mean)/float(stddev) 
+      
       #split the dataset for training and testing
       total_score += test_set(X, Y)
     return total_score/float(len(test))
@@ -167,13 +168,13 @@ while(sc>epsilon):
       df=pd.read_csv(file)
       Y = df.values[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
-      X = df.values[:, :y_col]
+      X = df.values[:, :-3]
     
       #scale X to [0,1]
       X = (X+1.0)/2.0
     
       #normalize Y
-      Y = (Y-mean)/stddev
+      Y = (Y-mean)/float(stddev)
       
       #split the dataset for training and testing
       train_set(X, Y)
