@@ -18,7 +18,7 @@ from sklearn.model_selection import train_test_split
 y_col = -2 #-3: temp, -2: energy, -1: magnetization
 nbatch = 1 #number of batches for training
 split_test = 0.4
-learning_rate = 1e-7 #learning rate for gradient descent
+learning_rate = 5e-7 #learning rate for gradient descent
 epsilon = 0.05
 
 #split for train/test
@@ -47,7 +47,7 @@ def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
 
-n_filters=[1, 16, 32]
+n_filters=[1, 4, 16]
 filter_sizes=[3, 3, 3]
 
 x_image = tf.reshape(x, [-1,cst.lattice_size,cst.lattice_size,1])

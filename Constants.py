@@ -1,7 +1,7 @@
 import numpy as np
 
 #constants for data generation
-temps=np.arange(1e-8, 5, 0.1)
+temps=np.arange(1e-8, 5, 0.01)
 lattice_size = 16
 iterations = 2000	#n. of iterations to run for
 sampling_freq = 10 #save every n. iterations
