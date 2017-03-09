@@ -13,7 +13,9 @@ def plot_set(f):
     #temps = df.values[:,-3]
     #temp = str(temps[0])+" K"
     energies = df.values[:,-2]
-    mags = np.abs(np.mean(df.values[:,-1]))
+    energies_m = np.mean(energies)
+    energies_e = np.std(energies)
+    mags = np.mean(np.abs(df.values[:,-1]))
     mags_e = np.std(df.values[:,-1])
     temps = df.values[-1,-3]
     temp = str(temps)+" K"
@@ -31,9 +33,10 @@ def plot_set(f):
     plt.figure("energies")
     plt.plot(energies)
     plt.figure("magnetizations")
-    plt.errorbar(temps, mags, yerr=mags_e, color='k')
+    plt.subplot(211), plt.errorbar(temps, mags, yerr=mags_e, color='k')
     plt.plot((cst.T_c, cst.T_c), (0, 1), 'r--')
-
+    plt.subplot(212), plt.errorbar(temps, energies_m, yerr=energies_e, color='k')
+    plt.plot((cst.T_c, cst.T_c), (-4000,0), 'r--')
 
 
 
@@ -64,7 +67,8 @@ plt.xlabel('Iterations')
 plt.ylabel('Energy')
 plt.figure("magnetizations")
 plt.xlabel('Temperature (K)')
-plt.ylabel('Average Magnetization per Site')
+plt.subplot(211), plt.ylabel('Average Magnetization per Site')
+plt.subplot(212), plt.ylabel('Average Lattice Energy')
 #plt.legend(labels=datasets)
 
 plt.show()

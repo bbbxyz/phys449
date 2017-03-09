@@ -74,7 +74,6 @@ class IsingMonteCarlo:
                 newrow.append(current_m)
                 data.append(newrow)
         data=np.array(data)
-        
         outfile = "data/%.2f.%i.csv" % (self.T, self.nid)
         np.savetxt(outfile,data , delimiter=",", fmt='%.2f')
         
@@ -85,8 +84,8 @@ class IsingMonteCarlo:
         self.num_permutations = num_permutations + cst.skip
         self.p_num = 0      #current permutation number
         self.T = T          #temp in Kelvin
-        self.Grid = np.zeros((self.num_permutations, self.N, self.N))
-        self.energies = np.zeros(self.num_permutations)
-        self.mags = np.zeros(self.num_permutations)
+        self.Grid = np.zeros((self.num_permutations/cst.sampling_freq, self.N, self.N))
+        self.energies = np.zeros(self.num_permutations/cst.sampling_freq)
+        self.mags = np.zeros(self.num_permutations/cst.sampling_freq)
         
 

@@ -1,6 +1,5 @@
 '''
-todo:
-- move constants to Constants.py
+Script to generate data from the Ising MC model
 '''
 
 import Constants as cst

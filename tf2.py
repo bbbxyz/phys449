@@ -1,5 +1,5 @@
 """
-@author: massine yahia
+Convolutional Neural Network model
 
 """
 from __future__ import print_function
@@ -18,7 +18,7 @@ from sklearn.model_selection import train_test_split
 y_col = -2 #-3: temp, -2: energy, -1: magnetization
 nbatch = 1 #number of batches for training
 split_test = 0.4
-learning_rate = 1e-6 #learning rate for gradient descent
+learning_rate = 1e-7 #learning rate for gradient descent
 epsilon = 0.05
 
 #split for train/test
@@ -33,7 +33,7 @@ y_ = tf.placeholder(tf.float32, [None,1])
 
 #helper functions
 def weight_variable(shape):
-  initial = tf.truncated_normal(shape, mean=0.0, stddev=0.1)
+  initial = tf.truncated_normal(shape, mean=0.0, stddev=0.2)
   return tf.Variable(initial)
 
 def bias_variable(shape):
@@ -47,7 +47,7 @@ def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
 
-n_filters=[1, 16, 16]
+n_filters=[1, 16, 32]
 filter_sizes=[3, 3, 3]
 
 x_image = tf.reshape(x, [-1,cst.lattice_size,cst.lattice_size,1])
@@ -67,15 +67,15 @@ for layer_i, n_output in enumerate(n_filters[1:]):
 conv_output_size = reduce(lambda x, y: x*y, current_input.get_shape().as_list() [1:])
 conv_output_flat = tf.reshape(current_input, [-1, conv_output_size])
 
-W_fc1 = weight_variable([conv_output_size, conv_output_size])
-b_fc1 = bias_variable([conv_output_size])
+W_fc1 = weight_variable([conv_output_size, conv_output_size/4])
+b_fc1 = bias_variable([conv_output_size/4])
 
 h_fc1 = tf.nn.relu(tf.matmul(conv_output_flat, W_fc1) + b_fc1)
 
 keep_prob = tf.placeholder(tf.float32)
 h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
-W_fc2 = weight_variable([conv_output_size, 1])
+W_fc2 = weight_variable([conv_output_size/4, 1])
 b_fc2 = bias_variable([1])
 
 y=tf.nn.relu(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
