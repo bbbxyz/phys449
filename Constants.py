@@ -13,3 +13,4 @@ K_B = 1.0 			#boltzmann const in m^2 kg s^-2 K^-1
 J = 1.0       		#coupling coefficient
 T_c = 2*J/(K_B * np.log(1+np.sqrt(2)))
 newconstant = 500
+anotherconstant = 1
