@@ -2,7 +2,7 @@
 Convolutional Neural Network model
 
 """
-
+from __future__ import print_function
 import Constants as cst
 import glob, math
 import tensorflow as tf
