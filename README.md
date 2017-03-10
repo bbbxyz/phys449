@@ -9,6 +9,7 @@
 - Pandas 
 - MatPlotLib
 - Scikit-Learn
+
 All available via pip
 
 Python3.5
