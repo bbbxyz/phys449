@@ -2,15 +2,15 @@
 Convolutional Neural Network model
 
 """
-from __future__ import print_function
 
 import Constants as cst
 import glob, math
 import tensorflow as tf
 import numpy as np
-import pandas as pd
 from random import shuffle
 from time import time
+import pandas as pd
+from functools import reduce
 from sklearn.model_selection import train_test_split
 #from sklearn.cross_validation import train_test_split
 
@@ -67,15 +67,15 @@ for layer_i, n_output in enumerate(n_filters[1:]):
 conv_output_size = reduce(lambda x, y: x*y, current_input.get_shape().as_list() [1:])
 conv_output_flat = tf.reshape(current_input, [-1, conv_output_size])
 
-W_fc1 = weight_variable([conv_output_size, conv_output_size/4])
-b_fc1 = bias_variable([conv_output_size/4])
+W_fc1 = weight_variable([conv_output_size, int(conv_output_size/4)])
+b_fc1 = bias_variable([int(conv_output_size/4)])
 
 h_fc1 = tf.nn.relu(tf.matmul(conv_output_flat, W_fc1) + b_fc1)
 
 keep_prob = tf.placeholder(tf.float32)
 h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
-W_fc2 = weight_variable([conv_output_size/4, 1])
+W_fc2 = weight_variable([int(conv_output_size/4), 1])
 b_fc2 = bias_variable([1])
 
 y=tf.nn.relu(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)

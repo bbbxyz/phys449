@@ -84,8 +84,8 @@ class IsingMonteCarlo:
         self.num_permutations = num_permutations + cst.skip
         self.p_num = 0      #current permutation number
         self.T = T          #temp in Kelvin
-        self.Grid = np.zeros((self.num_permutations/cst.sampling_freq, self.N, self.N))
-        self.energies = np.zeros(self.num_permutations/cst.sampling_freq)
-        self.mags = np.zeros(self.num_permutations/cst.sampling_freq)
+        self.Grid = np.zeros((int(self.num_permutations/cst.sampling_freq), self.N, self.N))
+        self.energies = np.zeros(int(self.num_permutations/cst.sampling_freq))
+        self.mags = np.zeros(int(self.num_permutations/cst.sampling_freq))
         
 
