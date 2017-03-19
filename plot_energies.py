@@ -20,6 +20,8 @@ def plot_set(f):
     temps = df.values[-1,-3]
     temp = str(temps)+" K"
     spins = df.values[:,:-3]
+    iterations = np.arange(cst.skip+cst.sampling_freq,\
+			cst.skip+cst.iterations, cst.sampling_freq)
     N = cst.lattice_size
     '''
     plt.figure("spins")
@@ -31,7 +33,7 @@ def plot_set(f):
     '''
     
     plt.figure("energies")
-    plt.plot(energies)
+    plt.plot(iterations, energies)
     plt.figure("magnetizations")
     plt.subplot(211), plt.errorbar(temps, mags, yerr=mags_e, color='k')
     plt.plot((cst.T_c, cst.T_c), (0, 1), 'r--')
