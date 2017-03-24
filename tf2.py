@@ -4,11 +4,12 @@ Convolutional Neural Network model for regression
 """
 from __future__ import print_function
 import Constants as cst
-import glob, math
+import glob, math, threading
 import tensorflow as tf
 import numpy as np
 from random import shuffle
 from time import time
+from queue import Queue
 import pandas as pd
 from functools import reduce
 from sklearn.model_selection import train_test_split
@@ -162,6 +163,32 @@ def calculate_score():
       
     return total_score/float(len(test))
 
+threads = []
+
+def get_batch():
+    
+
+def create_batches():
+    minibatchX = np.array([]).reshape(0,feat)
+    minibatchY = np.array([]).reshape(0,1)
+    sel_f = np.random.random_integers(0,len(train)-1,batch_sampling_size).tolist()
+    samples = [train[i] for i in sel_f]
+    for file in samples:
+      #print(file)
+      df=pd.read_csv(file)
+      Y = df.values[:, y_col]
+      Y = np.reshape(Y, (len(Y),1))
+      X = df.values[:, :-3]
+      sel = np.random.random_integers(0,len(Y)-1, batch_size)
+      
+      #scale X to [0,1]
+      X = (X[sel]+1.0)/2.0
+      minibatchX = np.vstack((minibatchX,X))
+      
+      #normalize Y
+      Y = (Y[sel]-mean)/float(stddev)
+      minibatchY = np.vstack((minibatchY,Y))
+
 k = 0 #counter to keep track of number of times we've trained on the entire set 
 sc = 1.0 
 print("Calculating normalization parameters")
@@ -173,26 +200,7 @@ print("Starting training\n")
 while(sc>epsilon): 
     t0=time()
     for j in range(batch_per_epoch):
-      minibatchX = np.array([]).reshape(0,feat)
-      minibatchY = np.array([]).reshape(0,1)
-      sel_f = np.random.random_integers(0,len(train)-1,batch_sampling_size).tolist()
-      samples = [train[i] for i in sel_f]
-      for file in samples:
-          #print(file)
-          df=pd.read_csv(file)
-          Y = df.values[:, y_col]
-          Y = np.reshape(Y, (len(Y),1))
-          X = df.values[:, :-3]
-          sel = np.random.random_integers(0,len(Y)-1, batch_size)
-          
-          #scale X to [0,1]
-          X = (X[sel]+1.0)/2.0
-          minibatchX = np.vstack((minibatchX,X))
-          
-          #normalize Y
-          Y = (Y[sel]-mean)/float(stddev)
-          minibatchY = np.vstack((minibatchY,Y))
-      
+      minibatchX, minibatchY = get_batch()
       train_err = train_set(minibatchX, minibatchY)
     t2=time()    
     sc = calculate_score()
