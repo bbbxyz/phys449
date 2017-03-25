@@ -9,7 +9,7 @@ import tensorflow as tf
 import numpy as np
 from random import shuffle
 from time import time
-from queue import Queue
+from Queue import Queue
 import pandas as pd
 from functools import reduce
 from sklearn.model_selection import train_test_split
@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 
 
 y_col = -2 #-3: temp, -2: energy, -1: magnetization
-batch_size = 2 #number of samples from each file to sample when building batches
+batch_size = 10 #number of samples from each file to sample when building batches
 batch_sampling_size = 100
 batch_per_epoch = 5
 split_test = 0.005
@@ -26,6 +26,7 @@ epsilon = 0.05  #error at which to stop training
 l2_alpha = 0.000
 dim = cst.lattice_size
 data_type = tf.float32
+batches = Queue(maxsize=10)
 
 #split for train/test
 files = glob.glob('data/*.csv')
@@ -163,53 +164,70 @@ def calculate_score():
       
     return total_score/float(len(test))
 
-threads = []
-
 def get_batch():
-    
+    batch = batches.get()
+    return batch[0],batch[1]
 
 def create_batches():
-    minibatchX = np.array([]).reshape(0,feat)
-    minibatchY = np.array([]).reshape(0,1)
-    sel_f = np.random.random_integers(0,len(train)-1,batch_sampling_size).tolist()
-    samples = [train[i] for i in sel_f]
-    for file in samples:
-      #print(file)
-      df=pd.read_csv(file)
-      Y = df.values[:, y_col]
-      Y = np.reshape(Y, (len(Y),1))
-      X = df.values[:, :-3]
-      sel = np.random.random_integers(0,len(Y)-1, batch_size)
-      
-      #scale X to [0,1]
-      X = (X[sel]+1.0)/2.0
-      minibatchX = np.vstack((minibatchX,X))
-      
-      #normalize Y
-      Y = (Y[sel]-mean)/float(stddev)
-      minibatchY = np.vstack((minibatchY,Y))
+    while(1):
+        minibatchX = np.array([]).reshape(0,feat)
+        minibatchY = np.array([]).reshape(0,1)
+        sel_f = np.random.random_integers(0,len(train)-1,batch_sampling_size).tolist()
+        samples = [train[i] for i in sel_f]
+        for file in samples:
+          #print(file)
+          df=pd.read_csv(file)
+          Y = df.values[:, y_col]
+          Y = np.reshape(Y, (len(Y),1))
+          X = df.values[:, :-3]
+          sel = np.random.random_integers(0,len(Y)-1, batch_size)
+          
+          #scale X to [0,1]
+          X = (X[sel]+1.0)/2.0
+          minibatchX = np.vstack((minibatchX,X))
+          
+          #normalize Y
+          Y = (Y[sel]-mean)/float(stddev)
+          minibatchY = np.vstack((minibatchY,Y))
+        batches.put((minibatchX, minibatchY))
 
-k = 0 #counter to keep track of number of times we've trained on the entire set 
-sc = 1.0 
+def train_dataset():
+    k = 0 #counter to keep track of number of times we've trained on the entire set 
+    sc = 1.0 
+    while(sc>epsilon): 
+        t0=time()
+        for j in range(batch_per_epoch):
+          minibatchX, minibatchY = get_batch()
+          train_err = train_set(minibatchX, minibatchY)
+        t2=time()    
+        sc = calculate_score()
+        t3=time()
+        print(train_err)
+        print("Error: %f, Training time: %is, Test time: %is,\
+        Epoch %i" % (sc, (t2-t0), (t3-t2), k),end='\n')
+        k += 1
+
+
 print("Calculating normalization parameters")
 #shuffle(train)
 mean,stddev = get_normalization_params()
 print("Done")
+print("Creating threads")
+creator_thread1 = threading.Thread(target=create_batches)
+#creator_thread2 = threading.Thread(target=create_batches)
+#creator_thread3 = threading.Thread(target=create_batches)
+#creator_thread4 = threading.Thread(target=create_batches)
+trainer_thread= threading.Thread(target = train_dataset)
+print("Done")
+
 #start training until test set error is smaller than threshold 
 print("Starting training\n")
-while(sc>epsilon): 
-    t0=time()
-    for j in range(batch_per_epoch):
-      minibatchX, minibatchY = get_batch()
-      train_err = train_set(minibatchX, minibatchY)
-    t2=time()    
-    sc = calculate_score()
-    t3=time()
-    print(train_err)
-    print("Error: %f, Training time: %is, Test time: %is,\
-    Epoch %i" % (sc, (t2-t0), (t3-t2), k),end='\n')
-    k += 1
-    
+creator_thread1.start()
+#creator_thread2.start()
+#creator_thread3.start()
+#creator_thread4.start()
+trainer_thread.start()
+trainer_thread.join()
 print("Done!")
 print("Calculating validation score")
 print(calculate_score())
