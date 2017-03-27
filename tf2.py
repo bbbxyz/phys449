@@ -9,7 +9,7 @@ import tensorflow as tf
 import numpy as np
 from random import shuffle
 from time import time
-from Queue import Queue
+from queue import Queue
 import pandas as pd
 from functools import reduce
 import matplotlib.pyplot as plt
