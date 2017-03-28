@@ -5,11 +5,11 @@ Script to generate data from the Ising MC model
 import Constants as cst
 import numpy 
 import pandas as pd
-import glob, math, re
+import glob, math, re, time
 from multiprocessing import Process
 import IsingMonteCarlo as im
 
-
+t0 = time()
 n_proc = 4
 size = int(len(cst.temps)/float(n_proc))
 if not os.path.exists("data"):
@@ -32,3 +32,6 @@ for proc in procs:
 
 for proc in procs:
     proc.join()
+t1 = time()
+print("Data generated. Time taken: %is" % (t1-t0))
+
