@@ -20,28 +20,28 @@ from sklearn.model_selection import train_test_split
 data_directory='data/*.csv'  #data directory 
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
 batch_size = 200            #number of samples to take from each file
-split_test = 0.5             #test/train split
+split_test = 0.2             #test/train split
 learning_rate = 1e-6        #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
-max_epoch = 10          #how many epochs to run
+max_epoch = 400          #how many epochs to run
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
+test_batch = 20
 
 #conv. layers parameters
-n_filters=      [16, 32]
-filter_sizes=   [ 3,  3]
-pool =          [ 1,  1]
+n_filters=      [16, 32, 64]
+filter_sizes=   [ 3,  3,  3]
+pool =          [ 1,  1,  1]
 fc1_size = 1000
 
 #these parameters shouldn't change unless we run out of memory
 data_type = tf.float32
-batches = Queue(maxsize=100)
+batches = Queue(maxsize=50)
 test_batches = Queue(maxsize=30)
 
 #split for train/test
 files = glob.glob(data_directory)
 train, test = train_test_split(files,test_size=split_test)
-
 
 #helper functions
 def kernel_variable(shape):
@@ -104,7 +104,7 @@ y = tf.matmul(fc1, W_o) + b_o
 l2_loss = l2_alpha*(tf.nn.l2_loss(W_o) + tf.nn.l2_loss(W_fc1)) 
 loss = l2_loss + tf.reduce_mean(tf.square(y-y_))
 accuracy = tf.reduce_mean(abs((y-y_)/y_)) 
-train_step = tf.train.AdadeltaOptimizer(learning_rate).minimize(loss)
+train_step = tf.train.AdagradOptimizer(learning_rate).minimize(loss)
 
 saver = tf.train.Saver()
 
@@ -180,7 +180,7 @@ def calculate_score(complete):
         total_score += score 
         
     else:
-      size=20
+      size = test_batch
       for j in range(size):
         X, Y = get_test_batch()
         score = test_set(X, Y) 
@@ -244,10 +244,9 @@ def create_batches():
     Creates batches from the training set and places them on the queue
     Runs as long as flag_running is set to 1
     '''
-    while(flag_running):
-      #shuffle(train)
+    while(True):
+      shuffle(train)
       for file in train:
-        if(flag_running):
           df=pd.read_csv(file)
           Y = df.values[:, y_col]
           Y = np.reshape(Y, (len(Y),1))
@@ -255,24 +254,21 @@ def create_batches():
           sel = np.random.random_integers(0,len(Y)-1, batch_size)
           X = X[sel]
           Y = (Y[sel]-mean)/float(stddev)
-          if(not batches.full()):
-            batches.put((X,Y))
+          batches.put((X,Y))
 
 def create_test_batches():
     '''
     Creates batches from the testing set and places them on the queue
     Runs as long as flag_running is set to 1
     '''
-    while(flag_running):
-        for file in test:
-          if(flag_running):
+    while(True):
+        for file in test[:test_batch]:
             df=pd.read_csv(file)
             Y = df.values[-batch_size:, y_col]
             Y = np.reshape(Y, (len(Y),1))
             X = df.values[-batch_size:, :-3]
             Y = (Y-mean)/float(stddev)
-            if(not test_batches.full()):
-              test_batches.put((X,Y))
+            test_batches.put((X,Y))
 
 def train_dataset():
     '''
@@ -281,7 +277,7 @@ def train_dataset():
     k = 0 #counter to keep track of number of times we've trained on the entire set 
     sc = 1.0 
     best = 10.0
-    frac = int(len(train)/10)
+    frac = int(len(train)/2)
     #frac = 2
     while(k<max_epoch): 
         train_err = 0.0
