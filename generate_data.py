@@ -12,6 +12,8 @@ import IsingMonteCarlo as im
 
 n_proc = 4
 size = int(len(cst.temps)/float(n_proc))
+if not os.path.exists("data"):
+    os.makedirs("data")
 
 def create_data(n_tot, n_id):
     temp_set = cst.temps[size*n_id:size*(n_id+1)]
