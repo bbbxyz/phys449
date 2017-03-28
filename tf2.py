@@ -1,10 +1,13 @@
 """
 Convolutional Neural Network model for regression
+
+Usage: $ python tf2.py [number of layers] [data directory] 
+
 """
 
 from __future__ import print_function
 import Constants as cst
-import glob, math, threading
+import glob, math, threading, sys
 from multiprocessing import Process, Queue
 import tensorflow as tf
 import numpy as np
@@ -17,26 +20,32 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 #from sklearn.cross_validation import train_test_split
 
-data_directory='data/*.csv'  #data directory 
+if(len(sys.argv) <3):
+    print("Not enough input arguments")
+    print("Correct usage: $ python tf2.py [number of layers] [data directory]")
+    exit(1)
+    
+n_layers = int(sys.argv[1])  #get number of layers from command line
+data_directory=sys.argv[2] + '*.csv'  #data directory 
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
 batch_size = 200            #number of samples to take from each file
-split_test = 0.2             #test/train split
-learning_rate = 1e-6        #learning rate for gradient descent
+split_test = 0.4             #test/train split
+learning_rate = 1e-5       #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
 max_epoch = 400          #how many epochs to run
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
-test_batch = 20
+test_batch = 30
 
 #conv. layers parameters
-n_filters=      [16, 32, 64]
-filter_sizes=   [ 3,  3,  3]
-pool =          [ 1,  1,  1]
+n_filters=      [32, 64, 128, 256, 512, 1024, 2048][:n_layers]
+filter_sizes=   [ 3,  3,   3,   3,   3,    3,    3][:n_layers]
+pool =          [ 1,  1,   1,   1,   1,    1,    1][:n_layers]
 fc1_size = 1000
-
+print(n_filters)
 #these parameters shouldn't change unless we run out of memory
 data_type = tf.float32
-batches = Queue(maxsize=50)
+batches = Queue(maxsize=200)
 test_batches = Queue(maxsize=30)
 
 #split for train/test
@@ -277,7 +286,7 @@ def train_dataset():
     k = 0 #counter to keep track of number of times we've trained on the entire set 
     sc = 1.0 
     best = 10.0
-    frac = int(len(train)/2)
+    frac = int(len(train)/10)
     #frac = 2
     while(k<max_epoch): 
         train_err = 0.0
@@ -296,7 +305,6 @@ def train_dataset():
         print("Train/Test Error: %f/%f, Train/Test Time: %is/%is\
         Epoch %i" % (train_err, test_err, (t2-t0), (t3-t2), k),end='\n')
         k += 1
-
 
 print("Calculating normalization parameters")
 mean,stddev = get_normalization_params()
