@@ -7,30 +7,26 @@ import numpy
 import pandas as pd
 import glob, math, re
 from multiprocessing import Process
-import matplotlib.pyplot as plt
 import IsingMonteCarlo as im
 
-#need to clean this up
-size = int(len(cst.temps)/float(2))
-def create_dataa():
-	for i in reversed(cst.temps[:size]):
-		for nid in range(cst.instances):
-			print(i, nid)
-			ising = im.IsingMonteCarlo(cst.lattice_size, i, cst.iterations, nid)
-			ising.run()
-def create_datab():
-	for i in reversed(cst.temps[size:]):
-		for nid in range(cst.instances):
-			print(i, nid)
-			ising = im.IsingMonteCarlo(cst.lattice_size, i, cst.iterations, nid)
-			ising.run()
 
-creator_thread1 = Process(target=create_dataa, daemon=True)
-creator_thread2 = Process(target=create_datab, daemon=True)
+n_proc = 4
+size = int(len(cst.temps)/float(n_proc))
 
-creator_thread1.start()
+def create_data(n_tot, n_id):
+    temp_set = cst.temps[size*n_id:size*(n_id+1)]
+    for i in temp_set:
+        for nid in range(cst.instances):
+            print(i, nid)
+            ising = im.IsingMonteCarlo(cst.lattice_size, i, cst.iterations, nid)
+            ising.run()
 
-creator_thread2.start()
+procs = []
+for i in range(n_proc):
+    procs.append(Process(target=create_data, args=(n_proc,i), daemon=True))
 
-creator_thread1.join()
-creator_thread2.join()
+for proc in procs:
+    proc.start()
+
+for proc in procs:
+    proc.join()
