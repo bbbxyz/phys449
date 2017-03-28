@@ -4,13 +4,13 @@ Convolutional Neural Network model for regression
 
 from __future__ import print_function
 import Constants as cst
-import glob, math
-from multiprocessing import Process
+import glob, math, threading
+from multiprocessing import Process, Queue
 import tensorflow as tf
 import numpy as np
 from random import shuffle
 from time import time
-from queue import Queue
+#from queue import Queue
 import pandas as pd
 from functools import reduce
 import matplotlib.pyplot as plt
@@ -288,7 +288,7 @@ def train_dataset():
         t0=time()
         for j in range(frac):
           batchX, batchY = get_batch()
-          train_err += train_set(batchX, batchY)
+          train_err += train_set(batchX[0:], batchY[0:])
         t2=time()    
         test_err = calculate_score(False)
         t3=time()
@@ -308,7 +308,7 @@ print("Creating threads")
 flag_running = 1
 creator_thread1 = Process(target=create_batches, daemon=True)
 creator_thread2 = Process(target=create_test_batches, daemon=True)
-trainer_thread= Process(target=train_dataset, daemon=True)
+trainer_thread= threading.Thread(target=train_dataset, daemon=True)
 
 print("Starting training")
 creator_thread1.start()
