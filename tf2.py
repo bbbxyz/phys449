@@ -24,7 +24,7 @@ split_test = 0.5             #test/train split
 learning_rate = 1e-6        #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
-max_epoch = 1          #how many epochs to run
+max_epoch = 10          #how many epochs to run
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
 
 #conv. layers parameters
@@ -316,8 +316,8 @@ creator_thread2.start()
 trainer_thread.start()
 trainer_thread.join()
 flag_running = 0
-creator_thread1.join()
-creator_thread2.join()
+creator_thread1.terminate()
+creator_thread2.terminate()
 print("Training Completed")
 
 saver.restore(sess, "saved/CNN.ckpt")

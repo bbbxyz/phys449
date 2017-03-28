@@ -10,8 +10,8 @@ from multiprocessing import Process
 import matplotlib.pyplot as plt
 import IsingMonteCarlo as im
 
+#need to clean this up
 size = int(len(cst.temps)/float(2))
-
 def create_dataa():
 	for i in reversed(cst.temps[:size]):
 		for nid in range(cst.instances):
