@@ -4,7 +4,8 @@ Convolutional Neural Network model for regression
 
 from __future__ import print_function
 import Constants as cst
-import glob, math, threading
+import glob, math
+from multiprocessing import Process
 import tensorflow as tf
 import numpy as np
 from random import shuffle
@@ -18,33 +19,28 @@ from sklearn.model_selection import train_test_split
 
 data_directory='data/*.csv'  #data directory 
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
-batch_size = 50              #number of samples to take from each file
-split_test = 0.1             #test/train split
-learning_rate = 1e-4     #learning rate for gradient descent
+batch_size = 200            #number of samples to take from each file
+split_test = 0.5             #test/train split
+learning_rate = 1e-6        #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
-max_epoch = 1000               #how many epochs to run
+max_epoch = 1          #how many epochs to run
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
 
 #conv. layers parameters
-n_filters=      [64, 64,  64]
-filter_sizes=   [ 3,  3,   3]
-pool =          [ 1,  1,   1]
-fc1_size = 8000
+n_filters=      [16, 32]
+filter_sizes=   [ 3,  3]
+pool =          [ 1,  1]
+fc1_size = 1000
 
 #these parameters shouldn't change unless we run out of memory
 data_type = tf.float32
-batches = Queue(maxsize=10)
+batches = Queue(maxsize=100)
+test_batches = Queue(maxsize=30)
 
 #split for train/test
 files = glob.glob(data_directory)
 train, test = train_test_split(files,test_size=split_test)
-
-feat = cst.lattice_size*cst.lattice_size
-data_type = tf.float32
-
-x = tf.placeholder(tf.float32, [None, feat])
-y_ = tf.placeholder(tf.float32, [None,1])
 
 
 #helper functions
@@ -70,7 +66,11 @@ def max_pool_2x2(x):
 def avg_pool_2x2(x):
   return tf.nn.avg_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
-                        
+
+feat = cst.lattice_size*cst.lattice_size
+x = tf.placeholder(tf.float32, [None, feat])
+y_ = tf.placeholder(tf.float32, [None,1])
+                       
 x_image = tf.reshape(x, [-1,dim,dim,1])
 current_input = x_image
 
@@ -90,7 +90,7 @@ conv_output_size = reduce(lambda x, y: x*y, current_input.get_shape().as_list() 
 b_conv = bias_variable([conv_output_size])
 conv_output_flat = tf.reshape(current_input, [-1, conv_output_size])\
                     + b_conv
-
+print(conv_output_size)
 W_fc1 = weight_variable([conv_output_size, fc1_size])
 b_fc1 = bias_variable([fc1_size])
 
@@ -102,7 +102,7 @@ fc1 = tf.tanh(tf.matmul(conv_output_flat, W_fc1) + b_fc1)
 y = tf.matmul(fc1, W_o) + b_o
 
 l2_loss = l2_alpha*(tf.nn.l2_loss(W_o) + tf.nn.l2_loss(W_fc1)) 
-loss = l2_loss + tf.reduce_mean(abs(y-y_))
+loss = l2_loss + tf.reduce_mean(tf.square(y-y_))
 accuracy = tf.reduce_mean(abs((y-y_)/y_)) 
 train_step = tf.train.AdadeltaOptimizer(learning_rate).minimize(loss)
 
@@ -116,7 +116,7 @@ sess.run(init)
 
 def get_normalization_params():
     '''
-    Calculates the mean and standard deviation of the training set
+    Calculates the (approximate) mean and standard deviation of the training set
     
     Returns mean, standard_deviation
     '''
@@ -154,34 +154,39 @@ def test_set(testX, testY):
     
     Returns testing accuracy and predictions
     '''
-    
-    score, predic, real = sess.run((accuracy,  y, y_), feed_dict={x: testX , y_: testY, keep_prob: 1.0 })
-    #print(predic[-1],real[-1])
-    #print(lo)
-    return score, predic
+    score= sess.run(accuracy, feed_dict={x: testX , y_: testY, keep_prob: 1.0 })
+    return score
+ 
+def predict_set(predX, predY):
+  return sess.run(y, feed_dict={x: predX , y_: predY, keep_prob: 1.0 })
  
 def calculate_score(complete):
     '''
     Calculates the accuracy on the entire testing set if
-    complete is set to True. Else calculates it on the first 20 files.
-    
+    complete is set to True.
+    Else calculates it on the first 20 elements
     Returns testing accuracy
     '''
     total_score = 0.0 
-    size = 20
-    for file in test:
-      df=pd.read_csv(file)
-      Y = df.values[:, y_col]
-      Y = np.reshape(Y, (len(Y),1))
-      X = df.values[:, :-3]
-      if(complete):
-        size = len(Y)
-      #Normalize y
-      Y = (Y-mean)/float(stddev)
-      score, predict = test_set(X[:size], Y[:size]) 
-      total_score += score 
+    if(complete):
+      size = len(test)
+      for file in test:
+        df=pd.read_csv(file)
+        Y = df.values[:, y_col]
+        Y = np.reshape(Y, (len(Y),1))
+        X = df.values[:, :-3] 
+        Y = (Y-mean)/float(stddev)
+        score = test_set(X, Y) 
+        total_score += score 
+        
+    else:
+      size=20
+      for j in range(size):
+        X, Y = get_test_batch()
+        score = test_set(X, Y) 
+        total_score += score 
     
-    return total_score/float(len(test))
+    return total_score/float(size)
 
 def plot_predictions():
     '''
@@ -189,19 +194,17 @@ def plot_predictions():
      from the test set
     '''
     for file in test[:5]:
-        df=pd.read_csv(file)
-        Y = df.values[:, y_col]
-        Y = np.reshape(Y, (len(Y),1))
-        X = df.values[:, :-3]
+      df=pd.read_csv(file)
+      Y = df.values[:, y_col]
+      Y = np.reshape(Y, (len(Y),1))
+      X = df.values[:, :-3]
 
-        #Normalize y
-        Y = (Y-mean)/float(stddev)
-
-        score, predict = test_set(X, Y) 
-        plt.plot(Y*stddev + mean, 'k')
-        plt.plot(predict*stddev + mean, 'r')        
+      #Normalize y
+      Y = (Y-mean)/float(stddev)
+      predict = predict_set(X, Y) 
+      plt.plot(Y*stddev + mean, 'k')
+      plt.plot(predict*stddev + mean, 'r--')        
     plt.show()
-
 
 def plot_confusion():
     '''
@@ -210,18 +213,17 @@ def plot_confusion():
     Y axis = predictions
     '''
     for file in test:
-        df=pd.read_csv(file)
-        Y = df.values[:20, y_col]
-        Y = np.reshape(Y, (len(Y),1))
-        X = df.values[:20, :-3]
-        
-        #Normalize y
-        Y = (Y-mean)/float(stddev)
-        score, predict = test_set(X, Y) 
-        plt.scatter(Y,predict, c='k', marker='.')
+      df=pd.read_csv(file)
+      Y = df.values[:, y_col]
+      Y = np.reshape(Y, (len(Y),1))
+      X = df.values[:, :-3]
+      
+      #Normalize y
+      Y = (Y-mean)/float(stddev)
+      predict = predict_set(X, Y) 
+      plt.scatter(Y,predict, c='k', marker='.', s=1)
     plt.plot([-5,5],[-5,5],'r')
     plt.show()
-
 
 def get_batch():
     '''
@@ -230,33 +232,47 @@ def get_batch():
     batch = batches.get()
     return batch[0],batch[1]
 
+def get_test_batch():
+    '''
+    Gets and returns a batch from the testing queue
+    '''
+    batch = test_batches.get()
+    return batch[0],batch[1]
+
 def create_batches():
     '''
     Creates batches from the training set and places them on the queue
     Runs as long as flag_running is set to 1
     '''
     while(flag_running):
-        #minibatchX = np.array([]).reshape(0,feat)
-        #minibatchY = np.array([]).reshape(0,1)
-        shuffle(train)
-        for file in train:
-          #print(file)
+      #shuffle(train)
+      for file in train:
+        if(flag_running):
           df=pd.read_csv(file)
           Y = df.values[:, y_col]
           Y = np.reshape(Y, (len(Y),1))
           X = df.values[:, :-3]
           sel = np.random.random_integers(0,len(Y)-1, batch_size)
-          
-          #scale X to [0,1]
-          #X = (X[sel]+1.0)/2.0
           X = X[sel]
-          
-          #normalize Y
           Y = (Y[sel]-mean)/float(stddev)
-          #Y = (Y-mean)/float(stddev)
           if(not batches.full()):
-            batches.put_nowait((X,Y))
+            batches.put((X,Y))
 
+def create_test_batches():
+    '''
+    Creates batches from the testing set and places them on the queue
+    Runs as long as flag_running is set to 1
+    '''
+    while(flag_running):
+        for file in test:
+          if(flag_running):
+            df=pd.read_csv(file)
+            Y = df.values[-batch_size:, y_col]
+            Y = np.reshape(Y, (len(Y),1))
+            X = df.values[-batch_size:, :-3]
+            Y = (Y-mean)/float(stddev)
+            if(not test_batches.full()):
+              test_batches.put((X,Y))
 
 def train_dataset():
     '''
@@ -265,16 +281,18 @@ def train_dataset():
     k = 0 #counter to keep track of number of times we've trained on the entire set 
     sc = 1.0 
     best = 10.0
+    frac = int(len(train)/10)
+    #frac = 2
     while(k<max_epoch): 
         train_err = 0.0
         t0=time()
-        for j in range(int(len(train)/10)):
+        for j in range(frac):
           batchX, batchY = get_batch()
           train_err += train_set(batchX, batchY)
         t2=time()    
         test_err = calculate_score(False)
         t3=time()
-        train_err = train_err/float(len(train)/10)
+        train_err = train_err/float(frac)
         if(best>=test_err):
             best= test_err
             #save the model if test error is lower
@@ -285,19 +303,21 @@ def train_dataset():
 
 
 print("Calculating normalization parameters")
-shuffle(train)
 mean,stddev = get_normalization_params()
 print("Creating threads")
 flag_running = 1
-creator_thread1 = threading.Thread(target=create_batches, daemon=True)
-trainer_thread= threading.Thread(target=train_dataset, daemon=True)
+creator_thread1 = Process(target=create_batches, daemon=True)
+creator_thread2 = Process(target=create_test_batches, daemon=True)
+trainer_thread= Process(target=train_dataset, daemon=True)
 
 print("Starting training")
 creator_thread1.start()
+creator_thread2.start()
 trainer_thread.start()
 trainer_thread.join()
 flag_running = 0
 creator_thread1.join()
+creator_thread2.join()
 print("Training Completed")
 
 saver.restore(sess, "saved/CNN.ckpt")
