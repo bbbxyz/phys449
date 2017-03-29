@@ -9,7 +9,7 @@ import glob, math, re, time
 from multiprocessing import Process
 import IsingMonteCarlo as im
 
-t0 = time()
+t0 = time.time()
 n_proc = 4
 size = int(len(cst.temps)/float(n_proc))
 if not os.path.exists("data"):
@@ -32,6 +32,6 @@ for proc in procs:
 
 for proc in procs:
     proc.join()
-t1 = time()
+t1 = time.time()
 print("Data generated. Time taken: %is" % (t1-t0))
 
