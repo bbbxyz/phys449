@@ -14,7 +14,6 @@ import numpy as np
 from random import shuffle
 from time import time
 #from queue import Queue
-import pandas as pd
 from functools import reduce
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -30,9 +29,9 @@ data_directory=sys.argv[3] + '*.csv'  #data directory
 max_epoch = int(sys.argv[2])        #how many epochs to run
 
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
-batch_size = 20            #number of samples to take from each file
+batch_size = 200            #number of samples to take from each file
 split_test = 0.4             #test/train split
-learning_rate = 1e-2      #learning rate for gradient descent
+learning_rate = 1e-5      #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
@@ -96,18 +95,19 @@ for i, n_output in enumerate(n_filters):
     if(pool[i]):
         output = max_pool_2x2(output)
     current_input = tf.tanh(output)
-
+    
+keep_prob = tf.placeholder(data_type)
 conv_output_size = reduce(lambda x, y: x*y, current_input.get_shape().as_list() [1:])
 b_conv = bias_variable([conv_output_size])
-conv_output_flat = tf.reshape(current_input, [-1, conv_output_size])\
-                    + b_conv
+conv_output_flat = tf.nn.dropout(tf.reshape(current_input, [-1, conv_output_size])\
+                    + b_conv, keep_prob)
 
 W_fc1 = weight_variable([conv_output_size, fc1_size])
 b_fc1 = bias_variable([fc1_size])
 W_o = weight_variable([fc1_size, 1])
 b_o= bias_variable([1])
 
-keep_prob = tf.placeholder(data_type)
+
 fc1 = (tf.matmul(conv_output_flat, W_fc1) + b_fc1)
 y = tf.matmul(fc1, W_o) + b_o
 
@@ -286,16 +286,15 @@ def train_dataset():
     '''
     Runs the training loop until max number of epochs is reached.
     '''
-    k = 0 #counter to keep track of number of times we've trained on the entire set 
-    sc = 1.0 
+    k = 0 
     best = 10.0
-    frac = int(len(train)/2)
+    frac = int(len(train)/5)
     while(k<max_epoch): 
         train_err = 0.0
         t0=time()
         for j in range(frac):
           batchX, batchY = get_batch()
-          train_err += train_set(batchX[0:], batchY[0:])
+          train_err += train_set(batchX, batchY)
         t2=time()    
         test_err = calculate_score(False)
         t3=time()
@@ -311,7 +310,6 @@ def train_dataset():
 print("Calculating normalization parameters")
 mean,stddev = get_normalization_params()
 print("Creating threads")
-flag_running = 1
 creator_thread1 = Process(target=create_batches, daemon=True)
 creator_thread2 = Process(target=create_test_batches, daemon=True)
 trainer_thread= threading.Thread(target=train_dataset, daemon=True)
@@ -322,7 +320,6 @@ creator_thread1.start()
 creator_thread2.start()
 trainer_thread.start()
 trainer_thread.join()
-flag_running = 0
 creator_thread1.terminate()
 creator_thread2.terminate()
 print("Training Completed")
