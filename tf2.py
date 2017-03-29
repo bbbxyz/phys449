@@ -1,13 +1,13 @@
 """
 Convolutional Neural Network model for regression
 
-Usage: $ python tf2.py [number of layers] [data directory] 
+Usage: $ python tf2.py [number of layers] [n. epochs] [data directory] 
 
 """
 
 from __future__ import print_function
 import Constants as cst
-import glob, math, threading, sys
+import glob, math, threading, sys, os
 from multiprocessing import Process, Queue
 import tensorflow as tf
 import numpy as np
@@ -20,33 +20,35 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 #from sklearn.cross_validation import train_test_split
 
-if(len(sys.argv) <3):
+if(len(sys.argv) < 4):
     print("Not enough input arguments")
-    print("Correct usage: $ python tf2.py [number of layers] [data directory]")
+    print("Correct usage: $ python tf2.py [number of layers] [n. epochs] [data directory]")
     exit(1)
     
 n_layers = int(sys.argv[1])  #get number of layers from command line
-data_directory=sys.argv[2] + '*.csv'  #data directory 
+data_directory=sys.argv[3] + '*.csv'  #data directory 
+max_epoch = int(sys.argv[2])        #how many epochs to run
+
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
-batch_size = 200            #number of samples to take from each file
+batch_size = 20            #number of samples to take from each file
 split_test = 0.4             #test/train split
-learning_rate = 1e-5       #learning rate for gradient descent
+learning_rate = 1e-2      #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
-max_epoch = 400          #how many epochs to run
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
-test_batch = 30
 
 #conv. layers parameters
 n_filters=      [32, 64, 128, 256, 512, 1024, 2048][:n_layers]
 filter_sizes=   [ 3,  3,   3,   3,   3,    3,    3][:n_layers]
 pool =          [ 1,  1,   1,   1,   1,    1,    1][:n_layers]
 fc1_size = 1000
-print(n_filters)
+
+
 #these parameters shouldn't change unless we run out of memory
 data_type = tf.float32
-batches = Queue(maxsize=200)
-test_batches = Queue(maxsize=30)
+test_batch_size = 100
+batches = Queue(maxsize=1000)
+test_batches = Queue(maxsize=200)
 
 #split for train/test
 files = glob.glob(data_directory)
@@ -99,23 +101,24 @@ conv_output_size = reduce(lambda x, y: x*y, current_input.get_shape().as_list() 
 b_conv = bias_variable([conv_output_size])
 conv_output_flat = tf.reshape(current_input, [-1, conv_output_size])\
                     + b_conv
-print(conv_output_size)
+
 W_fc1 = weight_variable([conv_output_size, fc1_size])
 b_fc1 = bias_variable([fc1_size])
-
 W_o = weight_variable([fc1_size, 1])
 b_o= bias_variable([1])
 
 keep_prob = tf.placeholder(data_type)
-fc1 = tf.tanh(tf.matmul(conv_output_flat, W_fc1) + b_fc1)
+fc1 = (tf.matmul(conv_output_flat, W_fc1) + b_fc1)
 y = tf.matmul(fc1, W_o) + b_o
 
-l2_loss = l2_alpha*(tf.nn.l2_loss(W_o) + tf.nn.l2_loss(W_fc1)) 
-loss = l2_loss + tf.reduce_mean(tf.square(y-y_))
+#l2_loss = l2_alpha*(tf.nn.l2_loss(W_o) + tf.nn.l2_loss(W_fc1)) 
+loss =  tf.reduce_mean(tf.square(y-y_))
 accuracy = tf.reduce_mean(abs((y-y_)/y_)) 
-train_step = tf.train.AdagradOptimizer(learning_rate).minimize(loss)
+train_step = tf.train.AdadeltaOptimizer(learning_rate).minimize(loss)
 
 saver = tf.train.Saver()
+if not os.path.exists("saved"):
+    os.makedirs("saved")
 
 #init = tf.initialize_all_variables()
 init = tf.global_variables_initializer()
@@ -132,16 +135,16 @@ def get_normalization_params():
     sum = 0.0
     n=0
     for file in train[:10]:
-      df=pd.read_csv(file)
-      Y = df.values[:, y_col]
+      df = np.loadtxt(file, delimiter=',')
+      Y = df[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
       sum += np.sum(Y)
       n += len(Y)
     mean = sum/float(n)
     var=0
     for file in train[:10]:
-      df=pd.read_csv(file)
-      Y = df.values[:, y_col]
+      df=np.loadtxt(file, delimiter=',')
+      Y = df[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
       var += np.sum(np.square(Y-mean))
     stddev = np.sqrt(var/float(n))
@@ -180,16 +183,16 @@ def calculate_score(complete):
     if(complete):
       size = len(test)
       for file in test:
-        df=pd.read_csv(file)
-        Y = df.values[:, y_col]
+        df=np.loadtxt(file, delimiter=',')
+        Y = df[:, y_col]
         Y = np.reshape(Y, (len(Y),1))
-        X = df.values[:, :-3] 
+        X = df[:, :-3] 
         Y = (Y-mean)/float(stddev)
         score = test_set(X, Y) 
         total_score += score 
         
     else:
-      size = test_batch
+      size = test_batch_size
       for j in range(size):
         X, Y = get_test_batch()
         score = test_set(X, Y) 
@@ -203,10 +206,10 @@ def plot_predictions():
      from the test set
     '''
     for file in test[:5]:
-      df=pd.read_csv(file)
-      Y = df.values[:, y_col]
+      df=np.loadtxt(file, delimiter=',')
+      Y = df[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
-      X = df.values[:, :-3]
+      X = df[:, :-3]
 
       #Normalize y
       Y = (Y-mean)/float(stddev)
@@ -222,10 +225,10 @@ def plot_confusion():
     Y axis = predictions
     '''
     for file in test:
-      df=pd.read_csv(file)
-      Y = df.values[:, y_col]
+      df=np.loadtxt(file, delimiter=',')
+      Y = df[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
-      X = df.values[:, :-3]
+      X = df[:, :-3]
       
       #Normalize y
       Y = (Y-mean)/float(stddev)
@@ -256,10 +259,10 @@ def create_batches():
     while(True):
       shuffle(train)
       for file in train:
-          df=pd.read_csv(file)
-          Y = df.values[:, y_col]
+          df=np.loadtxt(file, delimiter=',')
+          Y = df[:, y_col]
           Y = np.reshape(Y, (len(Y),1))
-          X = df.values[:, :-3]
+          X = df[:, :-3]
           sel = np.random.random_integers(0,len(Y)-1, batch_size)
           X = X[sel]
           Y = (Y[sel]-mean)/float(stddev)
@@ -271,11 +274,11 @@ def create_test_batches():
     Runs as long as flag_running is set to 1
     '''
     while(True):
-        for file in test[:test_batch]:
-            df=pd.read_csv(file)
-            Y = df.values[-batch_size:, y_col]
+        for file in test[:test_batch_size]:
+            df=np.loadtxt(file, delimiter=',')
+            Y = df[-batch_size:, y_col]
             Y = np.reshape(Y, (len(Y),1))
-            X = df.values[-batch_size:, :-3]
+            X = df[-batch_size:, :-3]
             Y = (Y-mean)/float(stddev)
             test_batches.put((X,Y))
 
@@ -286,8 +289,7 @@ def train_dataset():
     k = 0 #counter to keep track of number of times we've trained on the entire set 
     sc = 1.0 
     best = 10.0
-    frac = int(len(train)/10)
-    #frac = 2
+    frac = int(len(train)/2)
     while(k<max_epoch): 
         train_err = 0.0
         t0=time()
@@ -313,7 +315,8 @@ flag_running = 1
 creator_thread1 = Process(target=create_batches, daemon=True)
 creator_thread2 = Process(target=create_test_batches, daemon=True)
 trainer_thread= threading.Thread(target=train_dataset, daemon=True)
-
+print(n_filters)
+print(conv_output_size)
 print("Starting training")
 creator_thread1.start()
 creator_thread2.start()
