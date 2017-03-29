@@ -5,7 +5,7 @@ Script to generate data from the Ising MC model
 import Constants as cst
 import numpy 
 import pandas as pd
-import glob, math, re, time
+import glob, math, re, time, os
 from multiprocessing import Process
 import IsingMonteCarlo as im
 
