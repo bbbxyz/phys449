@@ -29,17 +29,16 @@ max_epoch = int(sys.argv[2])        #how many epochs to run
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
 batch_size = 200            #number of samples to take from each file
 split_test = 0.4             #test/train split
-learning_rate = 1e-8      #learning rate for gradient descent
+learning_rate = 1e-6      #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
 
 #conv. layers parameters
-n_filters=      [16, 32, 64, 256, 512, 1024, 2048][:n_layers]
+n_filters=      [16, 32,  64, 256, 512, 1024, 2048][:n_layers]
 filter_sizes=   [ 3,  3,   3,   3,   3,    3,    3][:n_layers]
 pool =          [ 1,  1,   1,   1,   1,    1,    1][:n_layers]
-fc1_size = 500
-
+fc1_size = 100
 
 #these parameters shouldn't change unless we run out of memory
 data_type = tf.float32
@@ -74,6 +73,34 @@ def max_pool_2x2(x):
 def avg_pool_2x2(x):
   return tf.nn.avg_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
+
+def get_normalization_params():
+    '''
+    Calculates the (approximate) mean and standard deviation of the training set
+    
+    Returns mean, standard_deviation
+    '''
+    sum = 0.0
+    n=0
+    for file in train[:10]:
+      df = np.loadtxt(file, delimiter=',')
+      Y = df[:, y_col]
+      Y = np.reshape(Y, (len(Y),1))
+      sum += np.sum(Y)
+      n += len(Y)
+    mean = sum/float(n)
+    var=0
+    for file in train[:10]:
+      df=np.loadtxt(file, delimiter=',')
+      Y = df[:, y_col]
+      Y = np.reshape(Y, (len(Y),1))
+      var += np.sum(np.square(Y-mean))
+    stddev = np.sqrt(var/float(n))
+    return mean,stddev
+
+
+print("Calculating normalization parameters")
+mean,stddev = get_normalization_params()
 
 feat = cst.lattice_size*cst.lattice_size
 x = tf.placeholder(tf.float32, [None, feat])
@@ -111,8 +138,10 @@ y = tf.matmul(fc1, W_o) + b_o
 
 #l2_loss = l2_alpha*(tf.nn.l2_loss(W_o) + tf.nn.l2_loss(W_fc1)) 
 loss =  tf.reduce_mean(tf.square(y-y_))
-accuracy = tf.reduce_mean(abs((y-y_)/y_)) 
-train_step = tf.train.MomentumOptimizer(learning_rate = learning_rate, momentum = 0.5).minimize(loss)
+outy = (y*stddev)+mean
+outy_ =(y_*stddev)+mean
+accuracy = tf.reduce_mean(abs((outy-outy_)/(mean+1e-10))) 
+train_step = tf.train.RMSPropOptimizer(learning_rate = learning_rate, momentum = 0.1, decay=0.3).minimize(loss)
 
 saver = tf.train.Saver()
 if not os.path.exists("saved"):
@@ -124,29 +153,6 @@ print("Starting TensorFlow session")
 sess = tf.Session()
 sess.run(init)
 
-def get_normalization_params():
-    '''
-    Calculates the (approximate) mean and standard deviation of the training set
-    
-    Returns mean, standard_deviation
-    '''
-    sum = 0.0
-    n=0
-    for file in train[:10]:
-      df = np.loadtxt(file, delimiter=',')
-      Y = df[:, y_col]
-      Y = np.reshape(Y, (len(Y),1))
-      sum += np.sum(Y)
-      n += len(Y)
-    mean = sum/float(n)
-    var=0
-    for file in train[:10]:
-      df=np.loadtxt(file, delimiter=',')
-      Y = df[:, y_col]
-      Y = np.reshape(Y, (len(Y),1))
-      var += np.sum(np.square(Y-mean))
-    stddev = np.sqrt(var/float(n))
-    return mean,stddev
 
 def train_set(trainX, trainY):
     '''
@@ -154,9 +160,9 @@ def train_set(trainX, trainY):
     
     Returns training accuracy
     '''
-    a, acc = sess.run((train_step, accuracy),\
+    a, score = sess.run((train_step, accuracy),\
         feed_dict={x: trainX, y_: trainY, keep_prob: 0.5})
-    return acc
+    return score
 
 def test_set(testX, testY):
     '''
@@ -309,8 +315,7 @@ def train_dataset():
         Epoch %i" % (train_err, test_err, (t2-t0), (t3-t2), k),end='\n')
         k += 1
 
-print("Calculating normalization parameters")
-mean,stddev = get_normalization_params()
+
 print("Creating threads")
 creator_thread1 = Process(target=create_batches, daemon=True)
 #creator_thread2 = Process(target=create_test_batches, daemon=True)
