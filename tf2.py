@@ -13,11 +13,9 @@ import tensorflow as tf
 import numpy as np
 from random import shuffle
 from time import time
-#from queue import Queue
 from functools import reduce
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-#from sklearn.cross_validation import train_test_split
 
 if(len(sys.argv) < 4):
     print("Not enough input arguments")
@@ -31,23 +29,23 @@ max_epoch = int(sys.argv[2])        #how many epochs to run
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
 batch_size = 200            #number of samples to take from each file
 split_test = 0.4             #test/train split
-learning_rate = 1e-5      #learning rate for gradient descent
+learning_rate = 1e-8      #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
 
 #conv. layers parameters
-n_filters=      [32, 64, 128, 256, 512, 1024, 2048][:n_layers]
+n_filters=      [16, 32, 64, 256, 512, 1024, 2048][:n_layers]
 filter_sizes=   [ 3,  3,   3,   3,   3,    3,    3][:n_layers]
 pool =          [ 1,  1,   1,   1,   1,    1,    1][:n_layers]
-fc1_size = 1000
+fc1_size = 500
 
 
 #these parameters shouldn't change unless we run out of memory
 data_type = tf.float32
-test_batch_size = 100
+test_batch_size = 30
 batches = Queue(maxsize=1000)
-test_batches = Queue(maxsize=200)
+#test_batches = Queue(maxsize=1000)
 
 #split for train/test
 files = glob.glob(data_directory)
@@ -55,11 +53,11 @@ train, test = train_test_split(files,test_size=split_test)
 
 #helper functions
 def kernel_variable(shape):
-  initial = tf.truncated_normal(shape, mean=0, stddev=0.05, dtype = data_type)
+  initial = tf.truncated_normal(shape, mean=0, stddev=0.1, dtype = data_type)
   return tf.Variable(initial)
   
 def weight_variable(shape):
-  initial = tf.truncated_normal(shape, mean=0, stddev=1/float(shape[1]), dtype = data_type)
+  initial = tf.truncated_normal(shape, mean=0, stddev=0.5/float(shape[1]), dtype = data_type)
   return tf.Variable(initial)
 
 def bias_variable(shape):
@@ -108,13 +106,13 @@ W_o = weight_variable([fc1_size, 1])
 b_o= bias_variable([1])
 
 
-fc1 = (tf.matmul(conv_output_flat, W_fc1) + b_fc1)
+fc1 = tf.tanh(tf.matmul(conv_output_flat, W_fc1) + b_fc1)
 y = tf.matmul(fc1, W_o) + b_o
 
 #l2_loss = l2_alpha*(tf.nn.l2_loss(W_o) + tf.nn.l2_loss(W_fc1)) 
 loss =  tf.reduce_mean(tf.square(y-y_))
 accuracy = tf.reduce_mean(abs((y-y_)/y_)) 
-train_step = tf.train.AdadeltaOptimizer(learning_rate).minimize(loss)
+train_step = tf.train.MomentumOptimizer(learning_rate = learning_rate, momentum = 0.5).minimize(loss)
 
 saver = tf.train.Saver()
 if not os.path.exists("saved"):
@@ -166,7 +164,8 @@ def test_set(testX, testY):
     
     Returns testing accuracy and predictions
     '''
-    score= sess.run(accuracy, feed_dict={x: testX , y_: testY, keep_prob: 1.0 })
+    score , pred= sess.run((accuracy, y), feed_dict={x: testX , y_: testY, keep_prob: 1.0 })
+    #print(pred[:1],testY[:1])
     return score
  
 def predict_set(predX, predY):
@@ -193,8 +192,13 @@ def calculate_score(complete):
         
     else:
       size = test_batch_size
-      for j in range(size):
-        X, Y = get_test_batch()
+      for file in test[:test_batch_size]:
+        #X, Y = get_test_batch()
+        df=np.loadtxt(file, delimiter=',')
+        Y = df[:, y_col]
+        Y = np.reshape(Y, (len(Y),1))
+        X = df[:, :-3] 
+        Y = (Y-mean)/float(stddev)
         score = test_set(X, Y) 
         total_score += score 
     
@@ -263,9 +267,7 @@ def create_batches():
           Y = df[:, y_col]
           Y = np.reshape(Y, (len(Y),1))
           X = df[:, :-3]
-          sel = np.random.random_integers(0,len(Y)-1, batch_size)
-          X = X[sel]
-          Y = (Y[sel]-mean)/float(stddev)
+          Y = (Y-mean)/float(stddev)
           batches.put((X,Y))
 
 def create_test_batches():
@@ -288,7 +290,7 @@ def train_dataset():
     '''
     k = 0 
     best = 10.0
-    frac = int(len(train)/5)
+    frac = int(len(train)/3)
     while(k<max_epoch): 
         train_err = 0.0
         t0=time()
@@ -311,17 +313,17 @@ print("Calculating normalization parameters")
 mean,stddev = get_normalization_params()
 print("Creating threads")
 creator_thread1 = Process(target=create_batches, daemon=True)
-creator_thread2 = Process(target=create_test_batches, daemon=True)
+#creator_thread2 = Process(target=create_test_batches, daemon=True)
 trainer_thread= threading.Thread(target=train_dataset, daemon=True)
 print(n_filters)
 print(conv_output_size)
 print("Starting training")
 creator_thread1.start()
-creator_thread2.start()
+#creator_thread2.start()
 trainer_thread.start()
 trainer_thread.join()
 creator_thread1.terminate()
-creator_thread2.terminate()
+#creator_thread2.terminate()
 print("Training Completed")
 
 saver.restore(sess, "saved/CNN.ckpt")
