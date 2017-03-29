@@ -27,9 +27,9 @@ data_directory=sys.argv[3] + '*.csv'  #data directory
 max_epoch = int(sys.argv[2])        #how many epochs to run
 
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
-batch_size = 200            #number of samples to take from each file
-split_test = 0.4             #test/train split
-learning_rate = 1e-6      #learning rate for gradient descent
+batch_size = 200            #number of samples to take from each file (unused)
+split_test = 0.2             #test/train split
+learning_rate = 5e-6      #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
@@ -38,7 +38,7 @@ dim = cst.lattice_size       #lattice dimensions, change if running on old data
 n_filters=      [16, 32,  64, 256, 512, 1024, 2048][:n_layers]
 filter_sizes=   [ 3,  3,   3,   3,   3,    3,    3][:n_layers]
 pool =          [ 1,  1,   1,   1,   1,    1,    1][:n_layers]
-fc1_size = 100
+fc1_size = 5
 
 #these parameters shouldn't change unless we run out of memory
 data_type = tf.float32
@@ -133,7 +133,7 @@ W_o = weight_variable([fc1_size, 1])
 b_o= bias_variable([1])
 
 
-fc1 = tf.tanh(tf.matmul(conv_output_flat, W_fc1) + b_fc1)
+fc1 = (tf.matmul(conv_output_flat, W_fc1) + b_fc1)
 y = tf.matmul(fc1, W_o) + b_o
 
 #l2_loss = l2_alpha*(tf.nn.l2_loss(W_o) + tf.nn.l2_loss(W_fc1)) 
