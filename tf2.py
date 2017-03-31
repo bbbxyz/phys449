@@ -140,7 +140,7 @@ y = tf.matmul(fc1, W_o) + b_o
 loss =  tf.reduce_mean(tf.square(y-y_))
 outy = (y*stddev)+mean
 outy_ =(y_*stddev)+mean
-accuracy = tf.reduce_mean(abs(outy-outy_))/tf.reduce_mean(outy_) 
+accuracy = abs(tf.reduce_mean(abs(outy-outy_))/tf.reduce_mean(outy_))
 train_step = tf.train.RMSPropOptimizer(learning_rate = learning_rate, momentum = 0.1, decay=0.3).minimize(loss)
 
 saver = tf.train.Saver()
