@@ -28,8 +28,8 @@ max_epoch = int(sys.argv[2])        #how many epochs to run
 
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
 batch_size = 200            #number of samples to take from each file (unused)
-split_test = 0.2             #test/train split
-learning_rate = 5e-6      #learning rate for gradient descent
+split_test = 0.5             #test/train split
+learning_rate = 1e-5      #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
@@ -43,7 +43,7 @@ fc1_size = 5
 #these parameters shouldn't change unless we run out of memory
 data_type = tf.float32
 test_batch_size = 30
-batches = Queue(maxsize=1000)
+batches = Queue(maxsize=5)
 #test_batches = Queue(maxsize=1000)
 
 #split for train/test
@@ -296,7 +296,7 @@ def train_dataset():
     '''
     k = 0 
     best = 10.0
-    frac = int(len(train)/3)
+    frac = int(len(train)/20)
     while(k<max_epoch): 
         train_err = 0.0
         t0=time()
