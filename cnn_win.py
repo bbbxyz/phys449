@@ -193,22 +193,29 @@ def calculate_score(complete):
         Y = np.reshape(Y, (len(Y),1))
         X = df[:, :-3] 
         Y = (Y-mean)/float(stddev)
-        score = test_set(X, Y) 
-        total_score += score 
-        
+        nbatches = int(len(Y)/batch_size)
+        for i in range(nbatches):
+            batchX = X[i*batch_size:(i+1)*batch_size,:]
+            batchY = Y[i*batch_size:(i+1)*batch_size]
+            score = test_set(batchX, batchY) 
+            total_score += score/float(nbatches)
+            
     else:
       size = test_batch_size
       j = 0
       for file in test[:test_batch_size]:
-        print("Testing Batch %i out of %i   " % (j+1, test_batch_size),end='\r')
-        #X, Y = get_test_batch()
+        print("Testing File %i out of %i   " % (j+1, test_batch_size),end='\r')
         df=np.loadtxt(file, delimiter=',')
         Y = df[:, y_col]
         Y = np.reshape(Y, (len(Y),1))
         X = df[:, :-3] 
         Y = (Y-mean)/float(stddev)
-        score = test_set(X, Y) 
-        total_score += score
+        nbatches = int(len(Y)/batch_size)
+        for i in range(nbatches):
+            batchX = X[i*batch_size:(i+1)*batch_size,:]
+            batchY = Y[i*batch_size:(i+1)*batch_size]
+            score = test_set(batchX, batchY) 
+            total_score += score/float(nbatches)
         j += 1 
     
     return total_score/float(size)
@@ -299,20 +306,26 @@ def train_dataset():
     '''
     k = 0 
     best = 10.0
-    frac = int(len(train)/5)
+    frac = int(len(train))
     while(k<max_epoch): 
         train_err = 0.0
         t0=time()
         j=0
         for file in train:
-          print("Training Batch %i out of %i" % (j+1, frac),end='\r')
+          print("Training File %i out of %i" % (j+1, frac),end='\r')
+          j+=1
           df=np.loadtxt(file, delimiter=',')
           Y = df[:, y_col]
           Y = np.reshape(Y, (len(Y),1))
           X = df[:, :-3]
           Y = (Y-mean)/float(stddev)
-          train_err += train_set(X, Y)
-          j+=1
+          nbatches = int(len(Y)/batch_size)
+          for i in range(nbatches):
+            batchX = X[i*batch_size:(i+1)*batch_size,:]
+            batchY = Y[i*batch_size:(i+1)*batch_size]
+            score = train_set(batchX, batchY) 
+            train_err += score/float(nbatches)
+          
         t2=time()    
         test_err = calculate_score(False)
         t3=time()
@@ -346,5 +359,5 @@ saver.restore(sess, "saved/CNN.ckpt")
 print("Model restored")
 print("Calculating validation score")
 print(calculate_score(True))
-plot_predictions()
-plot_confusion()
+#plot_predictions()
+#plot_confusion()
