@@ -29,7 +29,7 @@ max_epoch = int(sys.argv[2])        #how many epochs to run
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
 batch_size = 200            #number of samples to take from each file (unused)
 split_test = 0.5             #test/train split
-learning_rate = 1e-5      #learning rate for gradient descent
+learning_rate = 1e-6      #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
@@ -140,7 +140,7 @@ y = tf.matmul(fc1, W_o) + b_o
 loss =  tf.reduce_mean(tf.square(y-y_))
 outy = (y*stddev)+mean
 outy_ =(y_*stddev)+mean
-accuracy = tf.reduce_mean(abs((outy-outy_)/(mean+1e-10))) 
+accuracy = tf.reduce_mean(abs(outy-outy_))/tf.reduce_mean(outy_) 
 train_step = tf.train.RMSPropOptimizer(learning_rate = learning_rate, momentum = 0.1, decay=0.3).minimize(loss)
 
 saver = tf.train.Saver()
@@ -198,7 +198,9 @@ def calculate_score(complete):
         
     else:
       size = test_batch_size
+      j = 0
       for file in test[:test_batch_size]:
+        print("Testing Batch %i out of %i   " % (j+1, test_batch_size),end='\r')
         #X, Y = get_test_batch()
         df=np.loadtxt(file, delimiter=',')
         Y = df[:, y_col]
@@ -206,7 +208,8 @@ def calculate_score(complete):
         X = df[:, :-3] 
         Y = (Y-mean)/float(stddev)
         score = test_set(X, Y) 
-        total_score += score 
+        total_score += score
+        j += 1 
     
     return total_score/float(size)
 
@@ -296,11 +299,12 @@ def train_dataset():
     '''
     k = 0 
     best = 10.0
-    frac = int(len(train)/20)
+    frac = int(len(train)/5)
     while(k<max_epoch): 
         train_err = 0.0
         t0=time()
         for j in range(frac):
+          print("Training Batch %i out of %i" % (j+1, frac),end='\r')
           batchX, batchY = get_batch()
           train_err += train_set(batchX, batchY)
         t2=time()    
