@@ -29,11 +29,11 @@ max_epoch = int(sys.argv[2])        #how many epochs to run
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
 batch_size = 200            #number of samples to take from each file (unused)
 split_test = 0.5             #test/train split
-learning_rate = 1e-6      #learning rate for gradient descent
+learning_rate = 1e-5      #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
-queue_size = 50             #decrease this if your run out of memory
+queue_size = 10             #decrease this if your run out of memory
 #conv. layers parameters
 n_filters=      [16, 32,  64, 256, 512, 1024, 2048][:n_layers]
 filter_sizes=   [ 3,  3,   3,   3,   3,    3,    3][:n_layers]
@@ -47,7 +47,7 @@ test_batch_size = 10
 #test_batches = Queue(maxsize=1000)
 
 #split for train/test
-files = glob.glob(data_directory)
+files = glob.glob(data_directory)[:4]
 train, test = train_test_split(files,test_size=split_test)
 
 #helper functions
@@ -105,8 +105,9 @@ mean,stddev = get_normalization_params()
 feat = cst.lattice_size*cst.lattice_size
 x = tf.placeholder(tf.float32, [None, feat])
 y_ = tf.placeholder(tf.float32, [None,1])
-                       
-x_image = tf.reshape(x, [-1,dim,dim,1])
+
+#scale input to [0,1]                       
+x_image = tf.reshape(x, [-1,dim,dim,1])*0.5+0.5
 current_input = x_image
 
 for i, n_output in enumerate(n_filters):
@@ -119,7 +120,7 @@ for i, n_output in enumerate(n_filters):
     output =  tf.add(conv2d(current_input, k), b)
     if(pool[i]):
         output = max_pool_2x2(output)
-    current_input = tf.tanh(output)
+    current_input = tf.nn.relu(output)
     
 keep_prob = tf.placeholder(data_type)
 conv_output_size = reduce(lambda x, y: x*y, current_input.get_shape().as_list() [1:])
@@ -129,11 +130,11 @@ conv_output_flat = tf.nn.dropout(tf.reshape(current_input, [-1, conv_output_size
 
 W_fc1 = weight_variable([conv_output_size, fc1_size])
 b_fc1 = bias_variable([fc1_size])
-W_o = weight_variable([fc1_size, 1])
-b_o= bias_variable([1])
+W_o = 10*weight_variable([fc1_size, 1])
+b_o= 10*bias_variable([1])
 
 
-fc1 = (tf.matmul(conv_output_flat, W_fc1) + b_fc1)
+fc1 = tf.nn.relu(tf.matmul(conv_output_flat, W_fc1) + b_fc1)
 y = tf.matmul(fc1, W_o) + b_o
 
 #l2_loss = l2_alpha*(tf.nn.l2_loss(W_o) + tf.nn.l2_loss(W_fc1)) 
@@ -141,7 +142,7 @@ loss =  tf.reduce_mean(tf.square(y-y_))
 outy = (y*stddev)+mean
 outy_ =(y_*stddev)+mean
 accuracy = abs(tf.reduce_mean(abs(outy-outy_))/tf.reduce_mean(outy_))
-train_step = tf.train.RMSPropOptimizer(learning_rate = learning_rate, momentum = 0.1, decay=0.3).minimize(loss)
+train_step = tf.train.RMSPropOptimizer(learning_rate = learning_rate, momentum = 0.1, decay=0.5).minimize(loss)
 
 saver = tf.train.Saver()
 if not os.path.exists("saved"):
@@ -204,7 +205,7 @@ def calculate_score(complete):
       size = test_batch_size
       j = 0
       for file in test[:test_batch_size]:
-        print("Testing File %i out of %i   " % (j+1, test_batch_size),end='\r')
+        print("Testing on File %i out of %i   " % (j+1, test_batch_size),end='\r')
         df=np.loadtxt(file, delimiter=',')
         Y = df[:, y_col]
         Y = np.reshape(Y, (len(Y),1))
@@ -225,15 +226,18 @@ def plot_predictions():
     Plots predictions and actual data for 5 files randomly chosen
      from the test set
     '''
-    for file in test[:5]:
+    for file in test[-5:]:
       df=np.loadtxt(file, delimiter=',')
       Y = df[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
       X = df[:, :-3]
-
-      #Normalize y
       Y = (Y-mean)/float(stddev)
-      predict = predict_set(X, Y) 
+      nbatches = int(len(Y)/batch_size)
+      predict=np.array([]).reshape(0,1)
+      for i in range(nbatches):
+            batchX = X[i*batch_size:(i+1)*batch_size,:]
+            batchY = Y[i*batch_size:(i+1)*batch_size]
+            predict = np.concatenate((predict,predict_set(batchX,batchY)))
       plt.plot(Y*stddev + mean, 'k')
       plt.plot(predict*stddev + mean, 'r--')        
     plt.show()
@@ -252,7 +256,12 @@ def plot_confusion():
       
       #Normalize y
       Y = (Y-mean)/float(stddev)
-      predict = predict_set(X, Y) 
+      predict=np.array([]).reshape(0,1)
+      nbatches = int(len(Y)/batch_size)
+      for i in range(nbatches):
+            batchX = X[i*batch_size:(i+1)*batch_size,:]
+            batchY = Y[i*batch_size:(i+1)*batch_size]
+            predict = np.concatenate((predict,predict_set(batchX,batchY)))
       plt.scatter(Y,predict, c='k', marker='.', s=1)
     plt.plot([-5,5],[-5,5],'r')
     plt.show()
@@ -312,7 +321,7 @@ def train_dataset():
         t0=time()
         j=0
         for file in train:
-          print("Training File %i out of %i" % (j+1, frac),end='\r')
+          print("Training on File %i out of %i" % (j+1, frac),end='\r')
           j+=1
           df=np.loadtxt(file, delimiter=',')
           Y = df[:, y_col]
@@ -359,5 +368,5 @@ saver.restore(sess, "saved/CNN.ckpt")
 print("Model restored")
 print("Calculating validation score")
 print(calculate_score(True))
-#plot_predictions()
-#plot_confusion()
+plot_predictions()
+plot_confusion()

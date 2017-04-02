@@ -28,12 +28,12 @@ max_epoch = int(sys.argv[2])        #how many epochs to run
 
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
 batch_size = 200            #number of samples to take from each file (unused)
-split_test = 0.5             #test/train split
-learning_rate = 1e-6      #learning rate for gradient descent
+split_test = 0.3            #test/train split
+learning_rate = 1e-5      #learning rate for gradient descent
 epsilon = 0.01               #error at which to stop training (UNUSED)
 l2_alpha = 0.00              #regularization term
 dim = cst.lattice_size       #lattice dimensions, change if running on old data
-
+queue_size = 2            #decrease this if you run out of memory
 #conv. layers parameters
 n_filters=      [16, 32,  64, 256, 512, 1024, 2048][:n_layers]
 filter_sizes=   [ 3,  3,   3,   3,   3,    3,    3][:n_layers]
@@ -42,13 +42,15 @@ fc1_size = 5
 
 #these parameters shouldn't change unless we run out of memory
 data_type = tf.float32
-test_batch_size = 30
-batches = Queue(maxsize=5)
-#test_batches = Queue(maxsize=1000)
+test_batch_size = 10
+
 
 #split for train/test
 files = glob.glob(data_directory)
 train, test = train_test_split(files,test_size=split_test)
+
+batches = Queue(maxsize=queue_size*len(train))
+test_batches = Queue(maxsize=queue_size*len(test))
 
 #helper functions
 def kernel_variable(shape):
@@ -82,7 +84,7 @@ def get_normalization_params():
     '''
     sum = 0.0
     n=0
-    for file in train[:10]:
+    for file in train[:5]:
       df = np.loadtxt(file, delimiter=',')
       Y = df[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
@@ -90,23 +92,25 @@ def get_normalization_params():
       n += len(Y)
     mean = sum/float(n)
     var=0
-    for file in train[:10]:
+    for file in train[:5]:
       df=np.loadtxt(file, delimiter=',')
       Y = df[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
       var += np.sum(np.square(Y-mean))
     stddev = np.sqrt(var/float(n))
-    return mean,stddev
+    frac = int(len(Y)/float(batch_size))
+    return mean,stddev,frac
 
 
 print("Calculating normalization parameters")
-mean,stddev = get_normalization_params()
+mean,stddev, frac = get_normalization_params()
 
 feat = cst.lattice_size*cst.lattice_size
 x = tf.placeholder(tf.float32, [None, feat])
 y_ = tf.placeholder(tf.float32, [None,1])
-                       
-x_image = tf.reshape(x, [-1,dim,dim,1])
+     
+#scale input to [0,1]                    
+x_image = tf.reshape(x, [-1,dim,dim,1])*0.5+0.5
 current_input = x_image
 
 for i, n_output in enumerate(n_filters):
@@ -119,7 +123,7 @@ for i, n_output in enumerate(n_filters):
     output =  tf.add(conv2d(current_input, k), b)
     if(pool[i]):
         output = max_pool_2x2(output)
-    current_input = tf.tanh(output)
+    current_input = tf.nn.relu(output)
     
 keep_prob = tf.placeholder(data_type)
 conv_output_size = reduce(lambda x, y: x*y, current_input.get_shape().as_list() [1:])
@@ -129,11 +133,11 @@ conv_output_flat = tf.nn.dropout(tf.reshape(current_input, [-1, conv_output_size
 
 W_fc1 = weight_variable([conv_output_size, fc1_size])
 b_fc1 = bias_variable([fc1_size])
-W_o = weight_variable([fc1_size, 1])
-b_o= bias_variable([1])
+W_o = 10*weight_variable([fc1_size, 1])
+b_o= 10*bias_variable([1])
 
 
-fc1 = (tf.matmul(conv_output_flat, W_fc1) + b_fc1)
+fc1 = tf.nn.relu(tf.matmul(conv_output_flat, W_fc1) + b_fc1)
 y = tf.matmul(fc1, W_o) + b_o
 
 #l2_loss = l2_alpha*(tf.nn.l2_loss(W_o) + tf.nn.l2_loss(W_fc1)) 
@@ -141,7 +145,7 @@ loss =  tf.reduce_mean(tf.square(y-y_))
 outy = (y*stddev)+mean
 outy_ =(y_*stddev)+mean
 accuracy = abs(tf.reduce_mean(abs(outy-outy_))/tf.reduce_mean(outy_))
-train_step = tf.train.RMSPropOptimizer(learning_rate = learning_rate, momentum = 0.1, decay=0.3).minimize(loss)
+train_step = tf.train.RMSPropOptimizer(learning_rate = learning_rate, momentum = 0.1, decay=0.5).minimize(loss)
 
 saver = tf.train.Saver()
 if not os.path.exists("saved"):
@@ -186,31 +190,15 @@ def calculate_score(complete):
     '''
     total_score = 0.0 
     if(complete):
-      size = len(test)
-      for file in test:
-        df=np.loadtxt(file, delimiter=',')
-        Y = df[:, y_col]
-        Y = np.reshape(Y, (len(Y),1))
-        X = df[:, :-3] 
-        Y = (Y-mean)/float(stddev)
-        score = test_set(X, Y) 
-        total_score += score 
-        
+      size = len(test)*frac
     else:
-      size = test_batch_size
-      j = 0
-      for file in test[:test_batch_size]:
-        print("Testing Batch %i out of %i   " % (j+1, test_batch_size),end='\r')
-        #X, Y = get_test_batch()
-        df=np.loadtxt(file, delimiter=',')
-        Y = df[:, y_col]
-        Y = np.reshape(Y, (len(Y),1))
-        X = df[:, :-3] 
-        Y = (Y-mean)/float(stddev)
-        score = test_set(X, Y) 
+      size = test_batch_size*frac
+      
+    for j in range(size):
+        print("Testing Batch %i out of %i                              " % (j+1, size),end='\r')
+        batchX, batchY = get_test_batch()
+        score = test_set(batchX, batchY)
         total_score += score
-        j += 1 
-    
     return total_score/float(size)
 
 def plot_predictions():
@@ -218,15 +206,18 @@ def plot_predictions():
     Plots predictions and actual data for 5 files randomly chosen
      from the test set
     '''
-    for file in test[:5]:
+    for file in test[-5:]:
       df=np.loadtxt(file, delimiter=',')
       Y = df[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
       X = df[:, :-3]
-
-      #Normalize y
       Y = (Y-mean)/float(stddev)
-      predict = predict_set(X, Y) 
+      nbatches = int(len(Y)/batch_size)
+      predict=np.array([]).reshape(0,1)
+      for i in range(nbatches):
+            batchX = X[i*batch_size:(i+1)*batch_size,:]
+            batchY = Y[i*batch_size:(i+1)*batch_size]
+            predict = np.concatenate((predict,predict_set(batchX,batchY)))
       plt.plot(Y*stddev + mean, 'k')
       plt.plot(predict*stddev + mean, 'r--')        
     plt.show()
@@ -245,7 +236,12 @@ def plot_confusion():
       
       #Normalize y
       Y = (Y-mean)/float(stddev)
-      predict = predict_set(X, Y) 
+      predict=np.array([]).reshape(0,1)
+      nbatches = int(len(Y)/batch_size)
+      for i in range(nbatches):
+            batchX = X[i*batch_size:(i+1)*batch_size,:]
+            batchY = Y[i*batch_size:(i+1)*batch_size]
+            predict = np.concatenate((predict,predict_set(batchX,batchY)))
       plt.scatter(Y,predict, c='k', marker='.', s=1)
     plt.plot([-5,5],[-5,5],'r')
     plt.show()
@@ -267,7 +263,7 @@ def get_test_batch():
 def create_batches():
     '''
     Creates batches from the training set and places them on the queue
-    Runs as long as flag_running is set to 1
+    
     '''
     while(True):
       shuffle(train)
@@ -277,21 +273,28 @@ def create_batches():
           Y = np.reshape(Y, (len(Y),1))
           X = df[:, :-3]
           Y = (Y-mean)/float(stddev)
-          batches.put((X,Y))
+          for i in range(int(len(Y)/batch_size)):
+            batchX = X[i*batch_size:(i+1)*batch_size,:]
+            batchY = Y[i*batch_size:(i+1)*batch_size]
+            batches.put((batchX,batchY))
 
 def create_test_batches():
     '''
     Creates batches from the testing set and places them on the queue
-    Runs as long as flag_running is set to 1
+    R
     '''
     while(True):
-        for file in test[:test_batch_size]:
+        for file in test:
             df=np.loadtxt(file, delimiter=',')
-            Y = df[-batch_size:, y_col]
+            Y = df[:, y_col]
             Y = np.reshape(Y, (len(Y),1))
-            X = df[-batch_size:, :-3]
+            X = df[:, :-3]
             Y = (Y-mean)/float(stddev)
-            test_batches.put((X,Y))
+            for i in range(int(len(Y)/batch_size)):
+                batchX = X[i*batch_size:(i+1)*batch_size,:]
+                batchY = Y[i*batch_size:(i+1)*batch_size]
+                test_batches.put((batchX,batchY))
+            
 
 def train_dataset():
     '''
@@ -299,18 +302,20 @@ def train_dataset():
     '''
     k = 0 
     best = 10.0
-    frac = int(len(train)/5)
+    nbatch = int(len(train)*frac)
     while(k<max_epoch): 
         train_err = 0.0
         t0=time()
-        for j in range(frac):
-          print("Training Batch %i out of %i" % (j+1, frac),end='\r')
+        for j in range(nbatch):
           batchX, batchY = get_batch()
-          train_err += train_set(batchX, batchY)
+          er = train_set(batchX, batchY)
+          train_err += er
+          print("Training Batch %i out of %i. Minibatch error:%.2f" % (j+1, nbatch, er),end='\r')
+
         t2=time()    
-        test_err = calculate_score(False)
+        test_err = calculate_score(True)
         t3=time()
-        train_err = train_err/float(frac)
+        train_err = train_err/float(nbatch)
         if(best>=test_err):
             best= test_err
             #save the model if test error is lower
@@ -322,22 +327,23 @@ def train_dataset():
 
 print("Creating threads")
 creator_thread1 = Process(target=create_batches, daemon=True)
-#creator_thread2 = Process(target=create_test_batches, daemon=True)
+creator_thread2 = Process(target=create_test_batches, daemon=True)
 trainer_thread= threading.Thread(target=train_dataset, daemon=True)
 print(n_filters)
 print(conv_output_size)
 print("Starting training")
 creator_thread1.start()
-#creator_thread2.start()
+creator_thread2.start()
 trainer_thread.start()
 trainer_thread.join()
 creator_thread1.terminate()
-#creator_thread2.terminate()
+
 print("Training Completed")
 
 saver.restore(sess, "saved/CNN.ckpt")
 print("Model restored")
 print("Calculating validation score")
 print(calculate_score(True))
+creator_thread2.terminate()
 plot_predictions()
 plot_confusion()
