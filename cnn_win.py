@@ -47,7 +47,7 @@ test_batch_size = 10
 #test_batches = Queue(maxsize=1000)
 
 #split for train/test
-files = glob.glob(data_directory)[:4]
+files = glob.glob(data_directory)
 train, test = train_test_split(files,test_size=split_test)
 
 #helper functions
@@ -368,5 +368,6 @@ saver.restore(sess, "saved/CNN.ckpt")
 print("Model restored")
 print("Calculating validation score")
 print(calculate_score(True))
-#plot_predictions()
+print("Plotting some predictions...")
+plot_predictions()
 #plot_confusion()
