@@ -1,7 +1,7 @@
 """
 Convolutional Neural Network model for regression
 
-Usage: $ python tf2.py [number of layers] [n. epochs] [data directory] 
+Usage: $ python tf2.py [number of layers] [filter size] [n. epochs]  [data directory] 
 
 """
 
@@ -17,14 +17,15 @@ from functools import reduce
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
-if(len(sys.argv) < 4):
+if(len(sys.argv) < 5):
     print("Not enough input arguments")
-    print("Correct usage: $ python tf2.py [number of layers] [n. epochs] [data directory]")
+    print("Correct usage: $ python tf2.py [number of layers] [filter size] [n. epochs]  [data directory]")
     exit(1)
     
 n_layers = int(sys.argv[1])  #get number of layers from command line
-data_directory=sys.argv[3] + '*.csv'  #data directory 
-max_epoch = int(sys.argv[2])        #how many epochs to run
+filter_size = int(sys.argv[2]) 
+max_epoch = int(sys.argv[3])        #how many epochs to run
+data_directory=sys.argv[4] + '*.csv'  #data directory 
 
 y_col = -2                   #-3: temp, -2: energy, -1: magnetization
 batch_size = 200            #number of samples to take from each file (unused)
@@ -36,7 +37,7 @@ dim = cst.lattice_size       #lattice dimensions, change if running on old data
 queue_size = 2            #decrease this if you run out of memory
 #conv. layers parameters
 n_filters=      [16, 32,  64, 256, 512, 1024, 2048][:n_layers]
-filter_sizes=   [ 3,  3,   3,   3,   3,    3,    3][:n_layers]
+filter_sizes=   [ 1,  1,   1,   1,   1,    1,    1][:n_layers]*filter_size
 pool =          [ 1,  1,   1,   1,   1,    1,    1][:n_layers]
 fc1_size = 5
 
