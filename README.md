@@ -1,8 +1,13 @@
 # phys449
 
-##Requirements
+## Instructions
+- Modify constants in Constants.py
+- Generate some data with '$ python GenerateData.py'
+- To create the model and train it: '$ python TrainModel.py [number of layers]  [number of epochs] [data directory]'  
 
-###Python packages:
+## Requirements
+
+### Python packages:
 - Numpy
 - Scipy
 - Tensorflow (or Tensorflow-GPU)
