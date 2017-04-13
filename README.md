@@ -2,8 +2,8 @@
 
 ## Instructions
 - Modify constants in Constants.py
-- Generate some data with '$ python GenerateData.py'
-- To create the model and train it: '$ python TrainModel.py [number of layers]  [number of epochs] [data directory]'  
+- Generate some data: `python GenerateData.py`
+- Create the model and train it: `python TrainModel.py [number of layers]  [number of epochs] [data directory]`
 
 ## Requirements
 
