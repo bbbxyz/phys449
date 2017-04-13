@@ -1,8 +1,0 @@
-all 60 epochs
-16x16
-1 layer, 0.13
-2 layers : 0.07
-3 layers : 0.04
-100x100
-2 layers: 0.09
-3 layers: 
