@@ -13,7 +13,6 @@
 - Scipy
 - Tensorflow (or Tensorflow-GPU)
 - Pandas 
-- MatPlotLib
 - Scikit-Learn
 
 All available via pip
