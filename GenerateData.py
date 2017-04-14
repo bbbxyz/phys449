@@ -5,8 +5,6 @@ Constants are defined in Constants.py
 '''
 
 import Constants as cst
-import numpy 
-import pandas as pd
 import time, os, sys
 from multiprocessing import Process
 import IsingMonteCarlo as im

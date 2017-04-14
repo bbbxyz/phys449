@@ -1,18 +1,21 @@
 """
-Training model for regression
+Training model for regression.
+
+Creates 2 subprocesses that fetch training/testing datafiles, splits  them 
+in batches and places batches on queues. 
+
+Saves trained model in folder 'saved/'
 
 Usage: $ python TrainModel.py [number of layers] [n. epochs]  [data directory] 
 
 """
 
 from __future__ import print_function
-import glob, math, threading, sys, os, argparse
+import glob, threading, sys
 from multiprocessing import Process, Queue
-import tensorflow as tf
 import numpy as np
 from random import shuffle
 from time import time
-from functools import reduce
 from sklearn.model_selection import train_test_split
 
 import Constants as cst

@@ -2,14 +2,9 @@
 Convolutional Neural Network model for regression
 
 """
-
-import argparse
-import glob, math, threading, sys, os
+import os
 import tensorflow as tf
-import numpy as np
 from functools import reduce
-
-import Constants as cst
 
 #helper functions
 def kernel_variable(shape):
