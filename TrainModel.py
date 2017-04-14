@@ -22,7 +22,7 @@ import Constants as cst
 import CNNModel as mdl
 
 batch_size = 200            
-learning_rate = 1e-4
+learning_rate = 1e-3
 
 def get_normalization_params():
     '''
@@ -68,6 +68,7 @@ def calculate_score(model, complete):
         score = model.test_set(batchX, batchY)
         total_score += score
     return total_score/float(size)
+
 
 def get_batch():
     '''
