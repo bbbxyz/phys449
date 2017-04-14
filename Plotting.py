@@ -1,5 +1,5 @@
 """
-
+Unused functions that might be useful some day
 """
 
 def plot_predictions():
