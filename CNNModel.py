@@ -118,12 +118,12 @@ class CNN_model:
         return score
    
     def predict_set(self, predX, predY):
-        return self.sess.run(y,\
+        return self.sess.run(self.y,\
             feed_dict={self.x: predX , self.y_: predY, self.keep_prob: 1.0 })
  
      
     def save_model(self):
-        save_path = self.saver.save(self.sess, "saved/CNN.ckpt")
+        self.saver.save(self.sess, "saved/CNN.ckpt")
         
     def restore_model(self):
         self.saver.restore(self.sess, "saved/CNN.ckpt")
