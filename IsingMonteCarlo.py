@@ -8,9 +8,6 @@ Saves one lattice state per row in the following format:
 import Constants as cst
 import numpy as np
 from scipy import signal
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-
 
 class IsingMonteCarlo:
     
@@ -74,11 +71,12 @@ class IsingMonteCarlo:
                 newrow.append(current_m)
                 data.append(newrow)
         data=np.array(data)
-        outfile = "data/%.2f.%i.csv" % (self.T, self.nid)
+        outfile = self.directory+"%.2f.%i.csv" % (self.T, self.nid)
         np.savetxt(outfile,data , delimiter=",", fmt='%.2f')
         
 
-    def __init__(self, N=20, T=1.0, num_permutations=1000, nid=0):
+    def __init__(self, N=20, T=1.0, num_permutations=1000, nid=0, directory='data/'):
+        self.directory = directory
         self.N = N
         self.nid = nid
         self.num_permutations = num_permutations + cst.skip

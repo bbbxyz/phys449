@@ -42,7 +42,7 @@ class CNN_model:
     
         #conv. layers parameters
         self.dim = dim
-        self.learning_rate = 1e-5
+        self.learning_rate = lr
         self.n_layers = n_layers
         self.n_filters=[16, 32,  64, 128, 256, 512, 1024][:n_layers]
         self.data_type = tf.float32

@@ -18,6 +18,9 @@ from sklearn.model_selection import train_test_split
 import Constants as cst
 import CNNModel as mdl
 
+batch_size = 200            
+learning_rate = 1e-4
+
 def get_normalization_params():
     '''
     Calculates the (approximate) mean and standard deviation of the training set
@@ -26,7 +29,7 @@ def get_normalization_params():
     '''
     sum = 0.0
     n=0
-    for file in train[:20]:
+    for file in train[:5]:
       df = np.loadtxt(file, delimiter=',')
       Y = df[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
@@ -34,7 +37,7 @@ def get_normalization_params():
       n += len(Y)
     mean = sum/float(n)
     var=0
-    for file in train[:20]:
+    for file in train[:5]:
       df=np.loadtxt(file, delimiter=',')
       Y = df[:, y_col]
       Y = np.reshape(Y, (len(Y),1))
@@ -122,7 +125,7 @@ def get_test_batch():
     batch = test_batches.get()
     return batch[0],batch[1]
 
-def create_batches():
+def create_batches(batches, train, mean, stddev, y_col):
     '''
     Creates batches from the training set and places them on the queue
     
@@ -140,7 +143,7 @@ def create_batches():
             batchY = Y[i*batch_size:(i+1)*batch_size]
             batches.put((batchX,batchY))
 
-def create_test_batches():
+def create_test_batches(test_batches, test, mean, stddev, y_col):
     '''
     Creates batches from the testing set and places them on the queue
     
@@ -180,7 +183,7 @@ def train_dataset(model, max_epoch):
         if(best>=test_err):
             best= test_err
             #save the model if test error is lower
-            
+            model.save_model()        
         print("Train/Test Error: %f/%f, Train/Test Time: %is/%is\
         Epoch %i" % (train_err, test_err, (t2-t0), (t3-t2), k),end='\n')
         k += 1
@@ -197,7 +200,6 @@ if __name__ == '__main__':
     
     dim = cst.lattice_size
     y_col = -2                   #-3: temp, -2: energy, -1: magnetization
-    batch_size = 200            
     split_test = 0.3            #test/train split
     queue_size = 2            #decrease this if you run out of memory
 
@@ -212,13 +214,16 @@ if __name__ == '__main__':
     mean,stddev, frac = get_normalization_params()
     
     model = mdl.CNN_model(n_layers, dim, \
-        mean, stddev)
+        mean, stddev, learning_rate)
     model.start_session()
     
     print("Creating threads")
-    creator_thread1 = Process(target=create_batches, daemon=True)
-    creator_thread2 = Process(target=create_test_batches, daemon=True)
+    creator_thread1 = Process(target=create_batches,\
+            args=(batches, train, mean, stddev, y_col,), daemon=True)
+    creator_thread2 = Process(target=create_test_batches,\
+            args=(test_batches, test, mean, stddev, y_col,), daemon=True)
     trainer_thread= threading.Thread(target=train_dataset, args=(model,max_epoch,), daemon=True)
+
     print("Starting training")
     creator_thread1.start()
     creator_thread2.start()
@@ -226,6 +231,9 @@ if __name__ == '__main__':
     trainer_thread.join()
     creator_thread1.terminate()
     print("Training Completed")
+
+    print("Restoring best model")
+    model.restore_model()
     
     print("Calculating validation score")
     print(calculate_score(model, True))
