@@ -7,8 +7,8 @@ min_temp = 0
 max_temp = 5
 temp_step = 0.05
 
-lattice_size =16
-iterations = 5000	#n. of iterations to run for
+lattice_size =32
+iterations = 8000	#n. of iterations to run for
 sampling_freq = 10  #save every n. iterations
 skip = 10000        	#n. of iterations to skip
 instances = 1		#n. of runs at each temperature
