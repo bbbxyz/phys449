@@ -6,7 +6,8 @@
 - Generate some data: `python GenerateData.py [data directory]`
 - Create the model and train it: `python TrainModel.py [number of layers]  [number of epochs] [data directory]`
     
-    Tip: You can save time in Unix by queuing commands with `;`. Ex: `python GenerateData.py data/; python TrainModel.py 3 10 data/`
+ <!---Tip: You can save time in Unix by queuing commands with `;`. Ex: `python GenerateData.py data/; python TrainModel.py 3 10 data/`--->
+
 ## Requirements
 
 ### Python packages:
