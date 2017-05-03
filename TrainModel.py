@@ -1,5 +1,5 @@
 """
-Training model for regression.
+Script for training the model for regression.
 
 Creates 2 subprocesses that fetch training/testing datafiles, splits  them 
 in batches and places batches on queues. 
